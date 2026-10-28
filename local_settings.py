@@ -33,5 +33,5 @@ def initial_admin_password():
     path.write_text(f'Username: admin\nPassword: {password}\n'
                     'Keep this file private. Delete it after saving your password.\n', encoding='utf-8')
     path.chmod(0o600)
-    print('首次启动已生成管理员密码，请打开 data/first-run-admin.txt 查看。')
+    print('First-run admin password saved to data/first-run-admin.txt. Keep it private.')
     return password

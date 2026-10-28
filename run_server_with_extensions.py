@@ -53,7 +53,7 @@ def main():
     host = os.environ.get("PROMPT_CRAWLER_HOST", "127.0.0.1")
     port = int(os.environ.get("PROMPT_CRAWLER_PORT", "5000"))
     print(f"Prompt Crawler: http://{host}:{port}")
-    print("首次登录：查看 data/first-run-admin.txt 中的随机管理员密码。")
+    print("First login: read the random password in data/first-run-admin.txt.")
     serve(server.app, host=host, port=port, threads=8)
 
 

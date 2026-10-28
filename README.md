@@ -25,7 +25,7 @@ Prompt Crawler 是一个在自己电脑上运行的网页工具：粘贴分享�
 
 目前完整安装流程面向 **Windows 10/11 64 位 + Python 3.12**。CPU 可运行，无需独立显卡；建议 16 GB 内存，并为浏览器、依赖和模型预留至少 8 GB 空间。长视频与本地视觉分析耗时取决于 CPU，不能保证实时完成。
 
-1. 在本仓库的 **Releases** 下载 `Prompt-Crawler-v1.0.0-Windows-Source.zip`，解压到自己的文件夹。也可以通过 **Code → Download ZIP** 下载源码。
+1. 在本仓库的 **Releases** 下载 `Prompt-Crawler-v1.0.1-Windows-Source.zip`，解压到自己的文件夹。也可以通过 **Code → Download ZIP** 下载源码。
 2. 安装 [Python 3.12](https://www.python.org/downloads/)；安装时勾选添加到 PATH。
 3. 安装包含 `ffmpeg` 和 `ffprobe` 的 FFmpeg，并加入 PATH。Windows 可在终端运行：
 

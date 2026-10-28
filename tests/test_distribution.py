@@ -1,5 +1,6 @@
 """Public distribution: fresh state, access control and portable adapters."""
 import os
+import io
 import subprocess
 import sys
 import tempfile
@@ -25,7 +26,9 @@ class DistributionTests(unittest.TestCase):
     def test_random_admin_password_and_config_validation(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(local_settings, 'DATA', Path(tmp)), \
                 patch.dict(os.environ, {}, clear=True):
-            password = local_settings.initial_admin_password()
+            # English Windows runners use cp1252; startup must not crash on a log message.
+            with io.TextIOWrapper(io.BytesIO(), encoding='cp1252') as output, patch('sys.stdout', output):
+                password = local_settings.initial_admin_password()
             self.assertGreaterEqual(len(password), 20)
             self.assertIn(password, (Path(tmp) / 'first-run-admin.txt').read_text())
             with patch.dict(os.environ, {'PROMPT_CRAWLER_ADMIN_PASSWORD': 'admin'}):
