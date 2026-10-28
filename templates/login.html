@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="bubble-theme">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f5f0fa"><title>Prompt Crawler · 欢迎回来</title>
+<link rel="icon" href="data:,"><link rel="stylesheet" href="{{ url_for('static', filename='bubble/bubble.css') }}">
+</head>
+<body class="bubble-login">
+<main class="login-layout">
+  <section class="login-visual" aria-label="泡泡灵感空间">
+    {% set ambient_layout = 'login' %}
+    {% include '_bubble_art.html' %}
+    <div class="login-glass" aria-hidden="true"></div>
+    <a class="login-brand" href="/login">Prompt <span>Crawler</span></a>
+    <div class="login-visual-copy">
+      <div class="eyebrow">A LITTLE SPACE FOR BIG IDEAS</div>
+      <h2>灵感，自由一点。</h2>
+      <p>从一条链接开始，让画面、文字与灵感<br>成为下一次创作的起点。</p>
+    </div>
+  </section>
+  <section class="login-panel" aria-label="账号登录">
+    <div class="login-card">
+      <p class="login-eyebrow">YOUR CREATIVE SPACE</p>
+      <h1>欢迎回来</h1>
+      <p class="login-subtitle">继续收集值得留下的灵感。</p>
+      <div class="login-tabs" role="tablist" aria-label="登录模式">
+        <button type="button" role="tab" data-mode="login" aria-selected="true" aria-controls="loginForm" class="active">账号登录</button>
+        <button type="button" role="tab" data-mode="register" aria-selected="false" aria-controls="registerPanel" tabindex="-1">开通账号</button>
+      </div>
+      <form id="loginForm">
+        <label for="username">账号</label>
+        <input id="username" name="username" autocomplete="username" placeholder="输入你的账号" required>
+        <label for="password">密码</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="输入密码" required>
+        <button class="login-submit" type="submit" id="submitBtn">进入创作空间</button>
+        <div class="login-msg" id="msg" role="status" aria-live="polite"></div>
+      </form>
+      <div id="registerPanel" hidden>
+        <p class="login-note">当前由管理员统一开通账号。<br>请联系管理员获取账号后登录。</p>
+        <button type="button" class="login-submit" onclick="setMode('login')">返回登录</button>
+      </div>
+      <p class="login-note">链接解析 · 关键帧 · 字幕 · 素材报告</p>
+    </div>
+  </section>
+</main>
+<script src="{{ url_for('static', filename='bubble/bubble.js') }}" defer></script>
+<script>
+const modeButtons=[...document.querySelectorAll('[data-mode]')];
+const loginForm=document.getElementById('loginForm');
+const submitBtn=document.getElementById('submitBtn');
+const msg=document.getElementById('msg');
+function setMode(mode){
+  modeButtons.forEach(button=>{
+    const selected=button.dataset.mode===mode;
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-selected',String(selected));
+    button.tabIndex=selected?0:-1;
+  });
+  loginForm.hidden=mode!=='login';
+  document.getElementById('registerPanel').hidden=mode==='login';
+  msg.textContent='';
+}
+modeButtons.forEach(button=>{
+  button.addEventListener('click',()=>setMode(button.dataset.mode));
+  button.addEventListener('keydown',event=>{
+    if(['ArrowLeft','ArrowRight'].includes(event.key)){
+      event.preventDefault();
+      const next=modeButtons.find(item=>item!==button);setMode(next.dataset.mode);next.focus();
+    }
+  });
+});
+loginForm.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(submitBtn.disabled)return;
+  submitBtn.disabled=true;submitBtn.textContent='正在登录…';msg.textContent='';
+  try{
+    const response=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:document.getElementById('username').value.trim(),password:document.getElementById('password').value})});
+    const data=await response.json();
+    if(data.ok){window.location.href='/';return;}
+    msg.textContent=data.error||'登录失败，请检查账号和密码。';
+  }catch(error){msg.textContent='暂时无法连接，请稍后重试。';}
+  finally{submitBtn.disabled=false;submitBtn.textContent='进入创作空间';}
+});
+</script>
+</body></html>

@@ -1,0 +1,33 @@
+# Private installation state
+data/
+secrets_config.py
+.env
+.env.*
+cookies*.txt
+*cookies*.json
+browser_state*/
+.helper_dir_cache
+_sph_feed.json
+
+# Downloaded media, models and generated exports
+.local-ai/
+douyin_images/
+bilibili_media/
+export/
+artifacts/
+backups/
+*.db
+*.sqlite*
+*.log
+*.zip
+
+# Development environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

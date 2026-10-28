@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}提示词采集站 · 抖音解析{% endblock %}
+{% block nav_douyin %}active{% endblock %}
+{% block search_ph %}搜索…{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{--dy:#fe2c55}
+  /* 固定解析表单 */
+  .form-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:24px}
+  .form-row{display:flex;gap:12px;align-items:flex-start}
+  .form-row textarea{flex:1;height:54px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    color:var(--text);padding:14px 16px;font-size:14px;resize:vertical;outline:none}
+  .form-row textarea:focus{border-color:var(--dy)}
+  .btn-go{background:var(--dy);border:none;color:#fff;padding:0 28px;height:54px;border-radius:12px;
+    font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+  .btn-go:hover{opacity:.9}.btn-go:disabled{opacity:.5;cursor:not-allowed}
+  .form-opts{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted)}
+  .form-opts input{width:16px;height:16px;accent-color:var(--dy)}
+  .form-status{margin-top:12px;font-size:13px;color:var(--gold);line-height:1.6;min-height:18px}
+
+  .rec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .rec-head h2{font-size:18px;font-weight:700}
+  .rec-head .cnt{color:var(--muted);font-size:13px}
+  .rec-refresh{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:7px 16px;
+    border-radius:8px;font-size:13px;cursor:pointer}
+  .rec-refresh:hover{border-color:var(--blue)}
+  .rec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  .rec:hover{border-color:#3d4452}
+  .rec-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .st{font-size:11px;font-weight:700;padding:3px 10px;border-radius:7px}
+  .st.done{background:rgba(16,185,129,.18);color:var(--green)}
+  .st.ing{background:var(--gold);color:#000}
+  .st.fail{background:#f5576c;color:#fff}
+  .rec-title{font-weight:700;font-size:15px;flex:1;min-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rec-meta{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px;flex-wrap:wrap}
+  .rec-text{font-size:13px;line-height:1.6;color:#c5cad3;background:#070708;border:1px solid var(--line);
+    border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:auto;margin-bottom:10px}
+  .rec-text.expanded{max-height:none}
+  .rec-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .ra{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:5px 13px;
+    border-radius:8px;font-size:12px;cursor:pointer;font-weight:600}
+  .ra:hover{border-color:var(--blue);color:var(--blue)}
+  .ra.copy{border-color:var(--green);color:var(--green)}
+  .ra.re{border-color:var(--gold);color:var(--gold)}
+  .ra.src{margin-left:auto;color:var(--blue)}
+  .ra.del{color:var(--muted)}
+  .ra.del:hover{border-color:var(--red);color:var(--red)}
+  .ra.zip{border-color:var(--gold);color:var(--gold)}
+  .ra.ocr{border-color:#a855f7;color:#c084fc}
+  .ra.ocr:hover{background:rgba(168,85,247,.12)}
+  .ra.report{border-color:var(--blue);color:var(--blue)}
+  .ra:disabled{opacity:.6;cursor:wait}
+  .rec-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-bottom:10px}
+  .rec-imgs .thumb{position:relative;aspect-ratio:3/4;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#070708}
+  .rec-imgs .thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+  .rec-imgs .thumb .dlone{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.6);
+    color:#fff;border:none;border-radius:6px;font-size:11px;padding:2px 6px;cursor:pointer;opacity:0;transition:.15s}
+  .rec-imgs .thumb:hover .dlone{opacity:1}
+  .empty{text-align:center;color:var(--muted);padding:60px 0}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>🎬 抖音解析</h1>
+    <div class="sub">粘贴抖音分享链接 → 自动下载视频 + 本地转字幕 → 文本直接展示，视频/音频/文本按需下载</div>
+  </div>
+</div>
+
+<div class="form-card">
+  <div class="form-row">
+    <textarea id="dyInput" placeholder="粘贴抖音分享链接或整段文案（抖音App → 分享 → 复制链接）…"></textarea>
+    <button class="btn-go" id="dyGo" onclick="submitDy()">开始解析</button>
+  </div>
+  <div class="form-opts">
+    <label><input type="checkbox" id="dySub" checked> 生成字幕（本地Whisper，免费，约1-3分钟）</label>
+  </div>
+  <div class="form-status" id="dyStatus"></div>
+</div>
+
+<div class="rec-head">
+  <h2>解析记录 <span class="cnt" id="recCnt"></span></h2>
+  <button class="rec-refresh" onclick="loadRecords()">🔄 刷新</button>
+</div>
+<div id="recList"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pollTimer=null;
+
+async function submitDy(){
+  const share=document.getElementById("dyInput").value.trim();
+  const sub=document.getElementById("dySub").checked;
+  const status=document.getElementById("dyStatus"),btn=document.getElementById("dyGo");
+  if(!share){status.textContent="请先粘贴抖音链接";return}
+  btn.disabled=true;btn.textContent="提交中…";status.innerHTML="提交中…";
+  try{
+    const r=await fetch("/api/add_douyin",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({share_text:share,subtitle:sub})});
+    const d=await r.json();
+    if(d.ok){
+      status.innerHTML="✅ 已加入后台！正在下载+转字幕（约1-3分钟），完成后下方记录自动更新。";
+      document.getElementById("dyInput").value="";
+      loadRecords();startPolling();
+    }else{status.innerHTML="❌ "+esc(d.error||"提交失败");}
+  }catch(e){status.innerHTML="❌ 请求失败："+esc(e.message);}
+  btn.disabled=false;btn.textContent="开始解析";
+}
+
+function startPolling(){
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    const hasIng=await loadRecords();
+    if(!hasIng){clearInterval(pollTimer);pollTimer=null;}
+  },5000);
+}
+
+let _lastListSig="";
+async function loadRecords(){
+  const d=await (await fetch("/api/douyin/list")).json();
+  document.getElementById("recCnt").textContent=`共 ${d.total} 条`;
+  const list=document.getElementById("recList");
+  if(!d.items.length){list.innerHTML=`<div class="empty">还没有解析记录，在上方粘贴抖音链接开始吧</div>`;_lastListSig="";return false;}
+  let hasIng=false;
+  const html=d.items.map(it=>{
+    if(it.status==="处理中")hasIng=true;
+    const stCls=it.status==="完成"?"done":it.status==="失败"?"fail":"ing";
+    const done=it.status==="完成";
+    return `<div class="rec">
+      <div class="rec-top">
+        <span class="st ${stCls}">${esc(it.status)}</span>
+        <span class="rec-title">${esc(it.title||"(无标题)")}</span>
+      </div>
+      <div class="rec-meta">
+        <span>👤 ${esc(it.author_name||"未知")}</span>
+        <span>🕐 ${fmtTime(it.crawled_at)}</span>
+        ${it.subtitle_len?`<span>📝 字幕 ${it.subtitle_len} 字</span>`:""}
+        ${it.has_video?`<span>🎬 有视频</span>`:""}
+        ${it.has_audio?`<span>🎵 有音频</span>`:""}
+      </div>
+      ${(done && it.image_urls && it.image_urls.length)?`
+        <div class="rec-imgs">
+          ${it.image_urls.map(u=>`
+            <div class="thumb">
+              <img src="${esc(u)}" loading="lazy" onclick="window.open('${esc(u)}','_blank')">
+              <button class="dlone" onclick="dlImg('${esc(u)}')">⬇</button>
+            </div>`).join("")}
+        </div>`:""}
+      ${done?`<div class="rec-text" id="rt-${it.id}">${esc(it.content)}</div>`:""}
+      <div class="rec-acts">
+        ${done?`
+          <button class="ra" onclick="toggleText(${it.id},this)">展开/收起</button>
+          <button class="ra" onclick="dl(${it.id},'video')">⬇ 视频</button>
+          <button class="ra" onclick="dl(${it.id},'audio')">⬇ 音频</button>
+          <button class="ra" onclick="dl(${it.id},'text')">⬇ 文本</button>
+          <button class="ra report" onclick="dl(${it.id},'report')">⬇ 报告</button>
+          ${(it.image_urls && it.image_urls.length)?`<button class="ra zip" onclick="dl(${it.id},'images')">⬇ 打包图片(${it.image_urls.length})</button>`:""}
+          ${(it.image_urls && it.image_urls.length)?`<button class="ra ocr" onclick="runOcr(${it.id},this)">🔍 识图提取提示词</button>`:""}
+          <button class="ra copy" onclick="copyRec(${it.id},this)">复制文本</button>
+        `:it.status==="失败"?`<button class="ra re" onclick="retry('${esc(it.source_url)}')">🔄 重新解析</button>`
+          :`<span style="color:var(--gold);font-size:12px">⏳ 处理中，请稍候…</span>`}
+        ${it.source_url?`<a class="ra src" href="${esc(it.source_url)}" target="_blank">原链接 ↗</a>`:""}
+        <button class="ra del" onclick="delRec(${it.id},'${esc((it.title||'这条记录').slice(0,20))}',this)">🗑 删除</button>
+      </div>
+    </div>`;
+  }).join("");
+  // 内容没变就不重绘，避免每 5 秒轮询导致列表闪烁
+  if(html!==_lastListSig){
+    list.innerHTML=html;
+    _lastListSig=html;
+  }
+  return hasIng;
+}
+
+function delRec(id,name,btn){
+  deleteItem(id,name,btn.closest(".rec"),()=>loadRecords());
+}
+
+function toggleText(id,btn){const el=document.getElementById("rt-"+id);if(el)el.classList.toggle("expanded");}
+function dl(id,kind){window.location.href=`/api/douyin/download?item_id=${id}&kind=${kind}`;}
+function dlImg(url){
+  const a=document.createElement("a");
+  a.href=url;a.download=url.split("/").pop();
+  document.body.appendChild(a);a.click();a.remove();
+}
+async function copyRec(id,btn){
+  const el=document.getElementById("rt-"+id);
+  const text=el?el.textContent:"";
+  copyText(text).then(()=>{btn.textContent="已复制";setTimeout(()=>btn.textContent="复制文本",1500)}).catch(()=>toast("复制失败"));
+}
+function retry(url){
+  if(!url){toast("没有原链接");return}
+  document.getElementById("dyInput").value=url;
+  window.scrollTo({top:0,behavior:"smooth"});
+  toast("已填入链接，点开始解析");
+}
+async function runOcr(id,btn){
+  const old=btn.textContent;
+  btn.disabled=true;btn.textContent="识图中…(每张图约1分钟)";
+  try{
+    const r=await fetch("/api/douyin/ocr",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({item_id:id})});
+    const d=await r.json();
+    if(d.ok){
+      if(d.prompt_text){toast("识图完成！已提取提示词");loadRecords();}
+      else{toast(d.msg||"图片里没识别到提示词");btn.disabled=false;btn.textContent=old;}
+    }else{toast("❌ "+(d.error||"识图失败"));btn.disabled=false;btn.textContent=old;}
+  }catch(e){toast("❌ 请求失败："+e.message);btn.disabled=false;btn.textContent=old;}
+}
+
+loadRecords().then(hasIng=>{if(hasIng)startPolling();});
+</script>
+{% endblock %}

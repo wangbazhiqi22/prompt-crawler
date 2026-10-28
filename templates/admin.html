@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}后台管理 · 提示词采集站{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .admin-head{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    margin:12px 0 24px;
+    padding:20px 0 4px;
+  }
+  .admin-kicker{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+    color:#7eeaff;
+    font-size:12px;
+    font-weight:950;
+  }
+  .admin-head h1{font-size:38px;line-height:1.1;font-weight:950}
+  .admin-head p{color:#aab8cf;font-size:14px;margin-top:8px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .panel{
+    position:relative;
+    background:linear-gradient(180deg, rgba(18,24,44,.78), rgba(10,14,28,.72));
+    border:1px solid rgba(140,166,255,.15);
+    border-radius:20px;
+    padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter:blur(16px) saturate(130%);
+    overflow:hidden;
+  }
+  .panel::before{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    height:1px;
+    background:linear-gradient(90deg, rgba(56,242,255,.48), transparent 42%, rgba(139,92,246,.36));
+    opacity:.60;
+  }
+  .num{font-size:32px;font-weight:950;line-height:1;color:#f7fbff}
+  .label{color:#94a3bb;font-size:13px;margin-top:8px}
+  .layout{display:grid;grid-template-columns:minmax(330px,390px) minmax(0,1fr);gap:18px;align-items:start}
+  h2{font-size:18px;font-weight:950;margin-bottom:12px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input,select{
+    width:100%;
+    height:42px;
+    background:rgba(19,25,44,.76);
+    border:1px solid rgba(140,166,255,.15);
+    border-radius:13px;
+    color:var(--text);
+    padding:0 12px;
+    outline:none;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+    transition:border-color .18s, box-shadow .18s, background .18s;
+  }
+  input::placeholder{color:#68768e}
+  input:focus,select:focus{border-color:rgba(56,242,255,.42);box-shadow:0 0 0 4px rgba(56,242,255,.07)}
+  .field{margin-bottom:10px}
+  .field label{display:block;color:#d7e5ff;font-size:12px;font-weight:850;margin-bottom:7px}
+  .user-list{display:flex;flex-direction:column;gap:8px;max-height:540px;overflow:auto}
+  .user-card{
+    border:1px solid rgba(140,166,255,.13);
+    background:rgba(8,12,24,.58);
+    border-radius:15px;
+    padding:13px;
+    cursor:pointer;
+    transition:transform .18s,border-color .18s,background .18s,box-shadow .18s;
+  }
+  .user-card:hover{transform:translateY(-1px);border-color:rgba(56,242,255,.30);box-shadow:0 12px 30px rgba(0,0,0,.22)}
+  .user-card.on{border-color:rgba(56,242,255,.52);background:rgba(11,31,54,.70);box-shadow:0 0 34px rgba(56,242,255,.10)}
+  .user-top{display:flex;justify-content:space-between;gap:10px;font-weight:950;line-height:1.35}
+  .user-meta{margin-top:8px;color:#8f9fb7;font-size:12px;display:flex;gap:10px;flex-wrap:wrap}
+  .toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:13px}
+  .toolbar input{min-width:220px;flex:1}
+  .toolbar select{width:auto;min-width:150px}
+  .record-list{display:flex;flex-direction:column;gap:10px;max-height:720px;overflow:auto}
+  .rec{
+    border:1px solid rgba(140,166,255,.13);
+    background:rgba(8,12,24,.58);
+    border-radius:16px;
+    padding:15px;
+    transition:border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .rec:hover{border-color:rgba(56,242,255,.28);transform:translateY(-1px);box-shadow:0 12px 34px rgba(0,0,0,.22)}
+  .rec-title{font-weight:950;line-height:1.45;color:#f7fbff;word-break:break-word}
+  .rec-meta{display:flex;gap:10px;flex-wrap:wrap;color:#8f9fb7;font-size:12px;margin-top:8px;align-items:center}
+  .badge{
+    font-size:11px;
+    font-weight:900;
+    border-radius:9px;
+    background:rgba(42,50,78,.72);
+    color:#d1dcf0;
+    padding:4px 8px;
+    border:1px solid rgba(255,255,255,.05);
+  }
+  .empty{border:1px dashed rgba(140,166,255,.18);border-radius:16px;color:var(--muted);text-align:center;padding:30px;background:rgba(16,18,34,.45)}
+  .split-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}.admin-head h1{font-size:32px}}
+  @media(max-width:640px){
+    .admin-head{align-items:flex-start;flex-direction:column}
+    .grid{grid-template-columns:1fr}
+    .form-row{grid-template-columns:1fr}
+    .toolbar{flex-direction:column}
+    .toolbar input,.toolbar select{width:100%;min-width:0}
+    .split-title{align-items:flex-start;flex-direction:column}
+    .panel{padding:16px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <div>
+    <div class="admin-kicker">ADMIN COMMAND CENTER</div>
+    <h1>后台管理</h1>
+    <p>管理账号、用户分类、工作记录和今日工作量。</p>
+  </div>
+  <a class="btn" href="/">返回首页</a>
+</div>
+
+<section class="grid">
+  <div class="panel"><div class="num" id="todayTotal">0</div><div class="label">今日总工作条数</div></div>
+  <div class="panel"><div class="num" id="allTotal">0</div><div class="label">累计工作条数</div></div>
+  <div class="panel"><div class="num" id="userTotal">0</div><div class="label">账号数量</div></div>
+  <div class="panel"><div class="num" id="activeTotal">0</div><div class="label">启用账号</div></div>
+</section>
+
+<section class="layout">
+  <div>
+    <div class="panel">
+      <h2>创建账号</h2>
+      <div class="form-row">
+        <div class="field"><label>账号</label><input id="newUsername" placeholder="例如 zhangsan"></div>
+        <div class="field"><label>密码</label><input id="newPassword" placeholder="初始密码"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>姓名/备注</label><input id="newDisplay" placeholder="显示名称"></div>
+        <div class="field"><label>用户分类</label><input id="newCategory" placeholder="如：实习生/运营/测试"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>角色</label><select id="newRole"><option value="user">普通用户</option><option value="super_admin">超级管理员</option></select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn primary" style="width:100%" onclick="createUser()">创建</button></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="split-title"><h2>用户列表</h2><button class="btn" onclick="loadUsers()">刷新</button></div>
+      <div class="toolbar">
+        <input id="userQ" placeholder="搜索账号/姓名" oninput="debouncedUsers()">
+        <select id="categoryFilter" onchange="loadUsers()"><option value="">全部分类</option></select>
+      </div>
+      <div class="user-list" id="userList"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="split-title">
+        <div>
+          <h2 id="recordTitle">全部用户工作记录</h2>
+          <div class="label" id="recordSub">选择左侧用户可查看个人明细</div>
+        </div>
+        <button class="btn" onclick="clearUserSelection()">查看全部</button>
+      </div>
+      <div class="toolbar">
+        <input id="recordQ" placeholder="搜索标题/正文/作者/链接" oninput="debouncedRecords()">
+        <select id="platformFilter" onchange="loadRecords()"><option value="">全部平台</option><option>抖音</option><option>B站</option><option>微信公众号</option><option>小红书</option><option>X</option><option>网页</option></select>
+        <select id="typeFilter" onchange="loadRecords()"><option value="">全部类型</option><option>拉片</option><option>视频</option><option>图文</option><option>链接提取</option></select>
+      </div>
+      <div class="record-list" id="recordList"></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let USERS=[], SELECTED_USER="";
+let userTimer=null, recordTimer=null;
+function debouncedUsers(){clearTimeout(userTimer);userTimer=setTimeout(loadUsers,250)}
+function debouncedRecords(){clearTimeout(recordTimer);recordTimer=setTimeout(loadRecords,250)}
+
+async function loadDashboard(){
+  const d=await (await fetch("/api/admin/dashboard")).json();
+  if(!d.ok)return;
+  document.getElementById("todayTotal").textContent=d.stats.total_today||0;
+  document.getElementById("allTotal").textContent=d.stats.total_all||0;
+}
+async function loadUsers(){
+  const q=document.getElementById("userQ").value.trim();
+  const category=document.getElementById("categoryFilter").value;
+  const d=await (await fetch(`/api/admin/users?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`)).json();
+  if(!d.ok)return toast(d.error||"加载用户失败");
+  USERS=d.users||[];
+  document.getElementById("userTotal").textContent=USERS.length;
+  document.getElementById("activeTotal").textContent=USERS.filter(u=>u.is_active).length;
+  const sel=document.getElementById("categoryFilter");
+  const old=sel.value;
+  sel.innerHTML='<option value="">全部分类</option>'+((d.categories||[]).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(""));
+  sel.value=old;
+  const list=document.getElementById("userList");
+  if(!USERS.length){list.innerHTML='<div class="empty">没有匹配用户</div>';return;}
+  list.innerHTML=USERS.map(u=>`<div class="user-card ${String(u.id)===String(SELECTED_USER)?'on':''}" onclick="selectUser(${u.id})">
+    <div class="user-top"><span>${esc(u.display_name||u.username)}</span><span class="badge">${esc(u.role==='super_admin'?'超管':'用户')}</span></div>
+    <div class="user-meta">
+      <span>@${esc(u.username)}</span>
+      ${u.user_category?`<span>${esc(u.user_category)}</span>`:""}
+      <span>今日 ${u.today_records||0}</span>
+      <span>累计 ${u.total_records||0}</span>
+      <span>${u.is_active?'启用':'停用'}</span>
+    </div>
+    <div class="user-meta">
+      <button class="btn" onclick="event.stopPropagation();quickEdit(${u.id})">编辑</button>
+    </div>
+  </div>`).join("");
+}
+function selectUser(id){
+  SELECTED_USER=id;
+  const u=USERS.find(x=>String(x.id)===String(id));
+  document.getElementById("recordTitle").textContent=(u?.display_name||u?.username||"用户")+" 的工作记录";
+  document.getElementById("recordSub").textContent=`账号：${u?.username||""} · 分类：${u?.user_category||"未分类"}`;
+  loadUsers();loadRecords();
+}
+function clearUserSelection(){
+  SELECTED_USER="";
+  document.getElementById("recordTitle").textContent="全部用户工作记录";
+  document.getElementById("recordSub").textContent="选择左侧用户可查看个人明细";
+  loadUsers();loadRecords();
+}
+async function createUser(){
+  const body={
+    username:document.getElementById("newUsername").value.trim(),
+    password:document.getElementById("newPassword").value,
+    display_name:document.getElementById("newDisplay").value.trim(),
+    user_category:document.getElementById("newCategory").value.trim(),
+    role:document.getElementById("newRole").value
+  };
+  const d=await (await fetch("/api/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+  if(!d.ok)return toast(d.error||"创建失败");
+  ["newUsername","newPassword","newDisplay","newCategory"].forEach(id=>document.getElementById(id).value="");
+  toast("账号已创建");
+  await loadUsers();await loadDashboard();
+}
+async function quickEdit(id){
+  const u=USERS.find(x=>x.id===id);
+  if(!u)return;
+  const display_name=prompt("显示名称",u.display_name||u.username);
+  if(display_name===null)return;
+  const user_category=prompt("用户分类",u.user_category||"");
+  if(user_category===null)return;
+  const password=prompt("新密码（留空不修改）","");
+  const d=await (await fetch(`/api/admin/users/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({display_name,user_category,password})})).json();
+  if(!d.ok)return toast(d.error||"保存失败");
+  toast("已保存");
+  await loadUsers();
+}
+async function loadRecords(){
+  const params=new URLSearchParams();
+  if(SELECTED_USER)params.set("user_id",SELECTED_USER);
+  const q=document.getElementById("recordQ").value.trim();
+  if(q)params.set("q",q);
+  const p=document.getElementById("platformFilter").value;
+  const t=document.getElementById("typeFilter").value;
+  if(p)params.set("platform",p);
+  if(t)params.set("content_type",t);
+  params.set("limit","300");
+  const d=await (await fetch(`/api/admin/records?${params.toString()}`)).json();
+  if(!d.ok)return toast(d.error||"加载记录失败");
+  const list=document.getElementById("recordList");
+  if(!d.items.length){list.innerHTML='<div class="empty">没有工作记录</div>';return;}
+  list.innerHTML=d.items.map(it=>`<div class="rec">
+    <div class="rec-title">${esc(it.title||"(无标题)")}</div>
+    <div class="rec-meta">
+      <span class="badge">${esc(it.platform||"")}</span>
+      <span class="badge">${esc(it.content_type||"")}</span>
+      <span>${esc(it.status||"")}</span>
+      <span>用户：${esc(it.owner_display_name||it.owner_username||"")}</span>
+      <span>分类：${esc(it.owner_category||"未分类")}</span>
+      <span>${esc((it.crawled_at||"").replace("T"," ").slice(0,16))}</span>
+      <span>正文 ${String(it.content||"").length} 字</span>
+    </div>
+    <div class="rec-meta">
+      <button class="btn" onclick="window.open('/api/extract/report?id=${it.id}','_blank')">下载报告</button>
+      ${it.source_url?`<a class="btn" href="${esc(it.source_url)}" target="_blank">原链接</a>`:""}
+    </div>
+  </div>`).join("");
+}
+loadDashboard();loadUsers();loadRecords();
+</script>
+{% endblock %}

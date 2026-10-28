@@ -1,0 +1,12 @@
+<div class="bubble-art" data-bubble data-scene-layout="{{ ambient_layout|default('workspace') }}">
+  <div class="bubble-stage">
+    <picture>
+      <source media="(max-width:760px)" srcset="{{ url_for('static', filename='ambient/' + ambient_layout|default('workspace') + '-mobile.png') }}">
+      <img src="{{ url_for('static', filename='ambient/' + ambient_layout|default('workspace') + '-poster.png') }}" alt="淡紫与粉色背景中的彩色软泡泡" width="2560" height="1440" fetchpriority="high">
+    </picture>
+  </div>
+  <div class="bubble-caption">
+    <span data-bubble-caption>移动鼠标，和 Bubble 打个招呼</span>
+    <button type="button" data-bubble-toggle aria-pressed="true">暂停互动</button>
+  </div>
+</div>

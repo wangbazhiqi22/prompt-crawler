@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}提示词采集站 · 工作区{% endblock %}
+{% block nav_workspace %}active{% endblock %}
+{% block search_ph %}搜索提示词、说明、作者{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* 网格 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+    display:flex;flex-direction:column;gap:10px;transition:.18s}
+  .pcard:hover{transform:translateY(-4px);border-color:#3d4452;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .pc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .badge{font-size:11px;padding:2px 9px;border-radius:99px}
+  .badge.cat{background:rgba(16,185,129,.15);color:var(--green)}
+  .badge.pf{background:var(--blue);color:#fff}
+  .badge.lang{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  .score{margin-left:auto;display:flex;align-items:center;gap:4px;font-weight:800;font-size:15px}
+  .score.hi{color:var(--gold)}.score.mid{color:var(--blue)}.score.lo{color:var(--muted)}
+  .rec-badge{font-size:11px;background:var(--gold);color:#000;padding:2px 8px;border-radius:99px;font-weight:700}
+  .summary{font-size:13px;color:#bcc4cc;line-height:1.5}
+  .prompt-box{position:relative;background:#070708;border:1px solid var(--line);border-radius:10px;padding:12px;padding-top:14px}
+  .prompt-box pre{font-family:"Cascadia Code","Consolas",monospace;font-size:12.5px;line-height:1.6;
+    color:#d6e3f0;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;margin:0}
+  .copy{position:absolute;top:8px;right:8px;background:var(--blue);color:#fff;border:none;
+    padding:4px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;opacity:.85}
+  .copy:hover{opacity:1}
+  .copy.done{background:var(--green)}
+  .trans{font-size:12px;color:var(--muted);line-height:1.6;border-left:2px solid var(--line);padding-left:10px}
+  .pc-foot{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);margin-top:auto;
+    padding-top:8px;border-top:1px solid var(--line)}
+  .pc-foot .av{width:20px;height:20px;font-size:10px}
+  .pc-foot a{margin-left:auto;color:var(--blue)}
+  .pc-foot .delbtn{cursor:pointer;color:var(--muted);opacity:.7;transition:.15s}
+  .pc-foot .delbtn:hover{color:var(--red);opacity:1}
+  .pc-foot a:not(:last-child)+.delbtn{margin-left:8px}
+  .pc-foot .delbtn:not(a+.delbtn){margin-left:auto}
+
+  /* 列表态：单列紧凑行 */
+  .grid.list{grid-template-columns:1fr;gap:10px}
+  .grid.list .pcard{flex-direction:row;flex-wrap:wrap;align-items:flex-start}
+  .grid.list .pc-top{flex:1 1 240px}
+  .grid.list .summary{flex:1 1 100%;order:3}
+  .grid.list .prompt-box{flex:1 1 100%;order:4}
+  .grid.list .prompt-box pre{max-height:120px}
+  .grid.list .trans{order:5;flex:1 1 100%}
+  .grid.list .pc-foot{order:6;flex:1 1 100%}
+
+  .btn{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;
+    border-radius:99px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{border-color:var(--blue)}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+  .btn.primary:hover{opacity:.9}
+  .count{color:var(--muted);font-size:14px}
+  .switch{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+  .switch input{width:38px;height:20px;appearance:none;background:var(--line);border-radius:99px;position:relative;cursor:pointer;transition:.2s}
+  .switch input:checked{background:var(--green)}
+  .switch input::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s}
+  .switch input:checked::after{left:20px}
+
+  .pager{display:flex;justify-content:center;gap:10px;margin:24px 0;align-items:center}
+  .pager button{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;border-radius:8px;cursor:pointer}
+  .pager button:disabled{opacity:.4;cursor:not-allowed}
+  .empty{text-align:center;color:var(--muted);padding:60px}
+  .empty a{color:var(--blue)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>🛠 提示词工作区</h1>
+    <div class="sub">已识别的精华提示词 · 可复制 / 批量下载</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="btn" onclick="copyAll()">复制本页全部</button>
+    <button class="btn primary" onclick="downloadCsv()">⬇ 批量下载</button>
+  </div>
+</div>
+
+<!-- 推荐大卡片区：高分/精选提示词置顶 -->
+<section class="recommend" id="recSection" style="display:none">
+  <div class="rec-head"><h2>★ 精选推荐</h2><span class="tag">高分提示词</span></div>
+  <div class="rec-row" id="recRow"></div>
+</section>
+
+<!-- 横向分类 Tab -->
+<div class="cat-tabs" id="catChips"></div>
+<div class="cat-tabs" id="pfChips" style="margin-bottom:14px"></div>
+
+<div class="toolbar">
+  <span class="count" id="count"></span>
+  <label class="switch"><input type="checkbox" id="onlyRec" onchange="reset()"> 只看精选</label>
+  <div class="seg" style="margin-left:auto">
+    <button id="sScore" class="on" onclick="setSort('score')">质量</button>
+    <button id="sTime" onclick="setSort('time')">最新</button>
+    <button id="sLike" onclick="setSort('like')">热度</button>
+  </div>
+  <div class="viewtoggle">
+    <button id="vGrid" class="on" onclick="setView('grid')" title="网格">
+      <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg></button>
+    <button id="vList" onclick="setView('list')" title="列表">
+      <svg viewBox="0 0 24 24"><path d="M3 5h18v3H3zm0 6h18v3H3zm0 6h18v3H3z"/></svg></button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+<div class="pager">
+  <button id="prev" onclick="changePage(-1)">上一页</button>
+  <span id="pageInfo"></span>
+  <button id="next" onclick="changePage(1)">下一页</button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let state={q:"",platform:"",category:"",only:"",sort:"score",page:1,totalPages:1,view:"grid"};
+let pageItems=[];
+
+async function loadStats(){
+  const d=await (await fetch("/api/stats")).json();
+  catChips.innerHTML=`<span class="cat-tab on" onclick="pickCat('',this)">全部分类</span>`+
+    d.categories.map(c=>`<span class="cat-tab" onclick="pickCat('${c}',this)">${c}</span>`).join("");
+  pfChips.innerHTML=`<span class="cat-tab on" onclick="pickPf('',this)">全部平台</span>`+
+    d.platforms.map(p=>`<span class="cat-tab" onclick="pickPf('${p}',this)">${p}</span>`).join("");
+}
+function pickCat(c,el){state.category=c;mark(el);reset()}
+function pickPf(p,el){state.platform=p;mark(el);reset()}
+function mark(el){[...el.parentElement.children].forEach(c=>c.classList.remove("on"));el.classList.add("on")}
+function setSort(s){state.sort=s;["score","time","like"].forEach(k=>document.getElementById("s"+k[0].toUpperCase()+k.slice(1)).classList.toggle("on",k===s));reset()}
+function setView(v){state.view=v;
+  document.getElementById("grid").classList.toggle("list",v==="list");
+  vGrid.classList.toggle("on",v==="grid");vList.classList.toggle("on",v==="list");}
+function reset(){state.page=1;load()}
+function changePage(d){const n=state.page+d;if(n<1||n>state.totalPages)return;state.page=n;load();window.scrollTo({top:0,behavior:"smooth"})}
+
+// 推荐区：拉高分精选前 10 条
+async function loadRecommend(){
+  const p=new URLSearchParams({sort:"score",only_recommended:"1",page:1});
+  const d=await (await fetch("/api/workspace?"+p)).json();
+  const items=(d.items||[]).slice(0,10);
+  if(!items.length){document.getElementById("recSection").style.display="none";return;}
+  document.getElementById("recSection").style.display="block";
+  document.getElementById("recRow").innerHTML=items.map(renderRec).join("");
+}
+function renderRec(it){
+  const title=(it.summary_zh||it.prompt_text||"提示词").slice(0,40);
+  return `<div class="rec-card" onclick="${it.source_url?`window.open('${esc(it.source_url)}','_blank')`:''}">
+    <div class="rec-cover ${gradClass(title)}">
+      <div class="big">${esc((it.summary_zh||it.category||"提示词").slice(0,40))}</div>
+      <span class="score">★ ${it.quality_score||0}</span>
+    </div>
+    <div class="rec-body">
+      <div class="rec-summary">${esc((it.prompt_text||"").slice(0,80))}</div>
+      <div class="rec-foot"><span class="av">${esc(initial(it.author_name))}</span>
+        <span>${esc(it.author_name||"匿名")}</span><span>·</span><span>${esc(it.platform)}</span></div>
+    </div>
+  </div>`;
+}
+
+async function load(){
+  state.q=document.getElementById("q").value.trim();
+  state.only=document.getElementById("onlyRec").checked?"1":"";
+  const p=new URLSearchParams({q:state.q,platform:state.platform,category:state.category,only_recommended:state.only,sort:state.sort,page:state.page});
+  const d=await (await fetch("/api/workspace?"+p)).json();
+  pageItems=d.items;
+  state.totalPages=Math.max(1,Math.ceil(d.total/d.page_size));
+  document.getElementById("count").textContent=`共 ${d.total} 条提示词`;
+  document.getElementById("pageInfo").textContent=`${d.page} / ${state.totalPages}`;
+  document.getElementById("prev").disabled=d.page<=1;
+  document.getElementById("next").disabled=d.page>=state.totalPages;
+  const grid=document.getElementById("grid");
+  if(!d.items.length){grid.innerHTML=`<div class="empty">还没有已识别的提示词。<br><br>请先运行 <code>py run_analyze.py</code> 让 AI 分析采集到的内容，<br>或返回 <a href="/">首页</a> 浏览原始内容。</div>`;return}
+  grid.innerHTML=d.items.map(renderCard).join("");
+}
+
+function scoreClass(s){return s>=85?"hi":s>=70?"mid":"lo"}
+function renderCard(it){
+  (window._WS_BY_ID=window._WS_BY_ID||{})[it.id]=it;
+  const rec=it.is_recommended?`<span class="rec-badge">★ 精选</span>`:"";
+  return `<div class="pcard">
+    <div class="pc-top">
+      <span class="badge pf">${esc(it.platform)}</span>
+      <span class="badge cat">${esc(it.category||"通用")}</span>
+      ${it.prompt_lang?`<span class="badge lang">${esc(it.prompt_lang)}</span>`:""}
+      ${rec}
+      <span class="score ${scoreClass(it.quality_score)}">★ ${it.quality_score||0}</span>
+    </div>
+    <div class="summary">${esc(it.summary_zh||"")}</div>
+    <div class="prompt-box">
+      <button class="copy" onclick='copyOne(this)' data-text="${esc(it.prompt_text||"")}">复制</button>
+      <pre>${esc(it.prompt_text||"(无提示词正文)")}</pre>
+    </div>
+    <div class="pc-foot">
+      <span class="av">${esc(initial(it.author_name))}</span>
+      <span>${esc(it.author_name||"匿名")}</span>
+      <span>·</span><span>${fmtTime(it.publish_time)}</span>
+      <span>❤ ${it.like_count||0}</span>
+      ${it.source_url?`<a href="${esc(it.source_url)}" target="_blank">原文 ↗</a>`:""}
+      <span class="delbtn" onclick="delCard(${it.id},this)" title="删除">🗑</span>
+    </div>
+  </div>`;
+}
+
+function delCard(id,el){
+  const card=el.closest(".pcard");
+  const it=(window._WS_BY_ID||{})[id];
+  const name=it?((it.summary_zh||it.prompt_text||"").slice(0,30)):"这条提示词";
+  deleteItem(id,name,card,()=>{if(window.load)load();});
+}
+
+function copyOne(btn){
+  const t=btn.getAttribute("data-text");
+  copyText(t).then(()=>{btn.textContent="已复制";btn.classList.add("done");setTimeout(()=>{btn.textContent="复制";btn.classList.remove("done")},1500)}).catch(e=>toast("复制失败："+e.message));
+}
+function copyAll(){
+  if(!pageItems.length){toast("本页没有内容");return}
+  const txt=pageItems.map(it=>`【${it.category}|${it.platform}|★${it.quality_score}】\n${it.prompt_text}`).join("\n\n──────────\n\n");
+  copyText(txt).then(()=>toast(`已复制本页 ${pageItems.length} 条提示词`)).catch(e=>toast("复制失败："+e.message));
+}
+function downloadCsv(){
+  const p=new URLSearchParams({platform:state.platform,category:state.category,only_recommended:state.only});
+  window.location.href="/api/export?"+p;
+  toast("开始下载…");
+}
+
+document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")reset()});
+loadStats();loadRecommend();load();
+</script>
+{% endblock %}

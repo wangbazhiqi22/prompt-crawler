@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}提示词采集站 · 首页{% endblock %}
+{% block nav_index %}active{% endblock %}
+{% block search_ph %}搜索内容、作者、关键词{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* 卡片墙 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:20px}
+  .stats{display:flex;gap:12px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 20px;text-align:center;min-width:96px}
+  .stat .n{font-size:22px;font-weight:800;color:var(--blue)}
+  .stat .n.g{color:var(--gold)}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    display:flex;flex-direction:column;cursor:default;transition:.18s}
+  .card:hover{transform:translateY(-4px);border-color:#3d4452;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .cover{height:172px;position:relative;overflow:hidden;flex-shrink:0}
+  .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .cover.txt{display:flex;align-items:center;justify-content:center;padding:18px;text-align:center}
+  .cover.txt .big{font-size:19px;font-weight:800;line-height:1.4;color:#fff;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .badges{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;backdrop-filter:blur(4px)}
+  .badge.pf{background:rgba(59,130,246,.9);color:#fff}
+  .badge.cat{background:rgba(16,185,129,.9);color:#fff}
+  .badge.rec{position:absolute;top:10px;right:10px;background:var(--gold);color:#000;z-index:2}
+
+  .body{padding:14px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .meta .nm{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+  .text{font-size:13.5px;line-height:1.55;color:#c5cad3;
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .trans{font-size:12.5px;color:#aab2bd;line-height:1.55;background:var(--panel2);
+    border-left:3px solid var(--green);border-radius:6px;padding:8px 10px}
+  .trans b{color:var(--green)}
+  .foot{margin-top:auto;display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);
+    padding-top:10px;border-top:1px solid var(--line)}
+  .foot .tbtn{color:var(--green);cursor:pointer;margin-left:auto}
+  .foot .src{color:var(--blue);cursor:pointer}
+  .foot .delbtn{cursor:pointer;color:var(--muted);opacity:.7;transition:.15s}
+  .foot .delbtn:hover{color:var(--red);opacity:1}
+  .foot .src+.delbtn,.foot .tbtn~.delbtn{margin-left:0}
+  .loadmore{grid-column:1/-1;padding:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;color:var(--blue);font-size:15px;font-weight:600;cursor:pointer;margin-top:6px}
+  .loadmore:hover{background:var(--panel2)}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:80px 0}
+
+  /* 添加抖音按钮 */
+  .dybtn{background:linear-gradient(135deg,#fe2c55,#ff6b9d);color:#fff;border:none;
+    padding:0 18px;height:40px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;
+    display:inline-flex;align-items:center}
+  .dybtn:hover{opacity:.9}
+  /* 弹窗 */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+  .modal.show{display:flex}
+  .modal-box{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;width:520px;max-width:92vw}
+  .modal-box h3{font-size:20px;margin-bottom:8px}
+  .modal-tip{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+  .modal-box textarea{width:100%;height:90px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;color:var(--text);padding:12px;font-size:14px;resize:vertical;outline:none}
+  .modal-box textarea:focus{border-color:var(--blue)}
+  .modal-opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:12px 0}
+  .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:8px}
+  .btn-ghost{background:none;border:1px solid var(--line);color:var(--text);padding:10px 20px;border-radius:10px;cursor:pointer}
+  .btn-go{background:var(--blue);border:none;color:#fff;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer}
+  .btn-go:disabled{opacity:.5;cursor:not-allowed}
+  .modal-status{margin-top:14px;font-size:13px;color:var(--gold);line-height:1.6;min-height:20px}
+
+  /* 抖音卡片专属 */
+  .dy-card .dy-text{-webkit-line-clamp:5;max-height:none;transition:.2s}
+  .dy-card .dy-text.expanded{-webkit-line-clamp:unset;display:block}
+  .dy-status{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;z-index:2}
+  .dy-status.ing{background:var(--gold);color:#000}
+  .dy-status.fail{background:#f5576c;color:#fff}
+  .dy-expand{background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;padding:2px 0;text-align:left;align-self:flex-start}
+  .dy-foot{flex-wrap:wrap;gap:8px}
+  .dy-dl{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600}
+  .dy-dl:hover{border-color:var(--blue);color:var(--blue)}
+  .dy-dl.copy{border-color:var(--green);color:var(--green)}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 抖音添加弹窗 -->
+<div class="modal" id="dyModal" onclick="if(event.target===this)closeDy()">
+  <div class="modal-box">
+    <h3>添加抖音视频</h3>
+    <p class="modal-tip">在抖音App点「分享→复制链接」，粘贴到下面。系统会下载视频、本地转字幕，再判断是否含提示词。</p>
+    <textarea id="dyInput" placeholder="粘贴抖音分享链接或整段文案…"></textarea>
+    <label class="modal-opt"><input type="checkbox" id="dySub" checked> 生成字幕（本地Whisper，较慢但能挖出口播提示词）</label>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeDy()">取消</button>
+      <button class="btn-go" id="dyGo" onclick="submitDy()">开始解析</button>
+    </div>
+    <div class="modal-status" id="dyStatus"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div>
+    <h1>最新发现</h1>
+    <div class="sub">各平台最新鲜的 AI 提示词相关内容 · 每天更新</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="stats">
+      <div class="stat"><div class="n" id="stTotal">—</div><div class="l">采集总量</div></div>
+      <div class="stat"><div class="n" id="stPrompt">—</div><div class="l">已识别提示词</div></div>
+      <div class="stat"><div class="n g" id="stRec">—</div><div class="l">精选推荐</div></div>
+    </div>
+    <button class="dybtn" onclick="openDy()">+ 添加抖音</button>
+  </div>
+</div>
+
+<div class="cat-tabs" id="pfChips"></div>
+<div class="toolbar">
+  <div class="seg">
+    <button id="sTime" class="on" onclick="setSort('time')">最新</button>
+    <button id="sLike" onclick="setSort('like')">热度</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let state={q:"",platform:"",sort:"time",page:1,totalPages:1};
+function firstImg(u){if(!u)return"";
+  for(const x of u.split(" ")){
+    if(!x)continue;
+    if(x.includes('fe-platform'))continue;
+    if(/\.(jpg|jpeg|png|webp|gif)/i.test(x)||x.includes('xhscdn')||x.includes('sns-webpic')||x.includes('youmind'))return x;
+  }
+  return "";}
+
+async function loadStats(){
+  const d=await (await fetch("/api/stats")).json();
+  stTotal.textContent=d.total;stPrompt.textContent=d.prompt_count;stRec.textContent=d.recommended_count;
+  pfChips.innerHTML=`<span class="cat-tab on" onclick="pickPf('',this)">全部平台</span>`+
+    d.platforms.map(p=>`<span class="cat-tab" onclick="pickPf('${p}',this)">${p}</span>`).join("");
+}
+function pickPf(p,el){state.platform=p;[...el.parentElement.children].forEach(c=>c.classList.remove("on"));el.classList.add("on");reset()}
+function setSort(s){state.sort=s;sTime.classList.toggle("on",s==="time");sLike.classList.toggle("on",s==="like");reset()}
+function reset(){state.page=1;document.getElementById("grid").innerHTML="";load()}
+function loadMore(){state.page++;load()}
+
+async function load(){
+  state.q=document.getElementById("q").value.trim();
+  const p=new URLSearchParams({q:state.q,platform:state.platform,sort:state.sort,page:state.page});
+  const d=await (await fetch("/api/items?"+p)).json();
+  state.totalPages=Math.max(1,Math.ceil(d.total/d.page_size));
+  const grid=document.getElementById("grid");
+  const oldBtn=document.getElementById("more");if(oldBtn)oldBtn.remove();
+  if(d.total===0){grid.innerHTML=`<div class="empty">没有匹配的内容</div>`;return}
+  grid.insertAdjacentHTML("beforeend",d.items.map(renderCard).join(""));
+  if(state.page<state.totalPages){
+    grid.insertAdjacentHTML("beforeend",`<button class="loadmore" id="more" onclick="loadMore()">加载更多（${d.total-state.page*d.page_size} 条未显示）</button>`);
+  }
+}
+
+function delCard(id,el){
+  const card=el.closest(".card");
+  const it=(window._ITEMS_BY_ID||{})[id];
+  const name=it?((it.title||it.content||"").split("\n")[0].slice(0,30)):"这条记录";
+  deleteItem(id,name,card,()=>{if(window.loadStats)loadStats();});
+}
+
+function renderCard(it){
+  (window._ITEMS_BY_ID=window._ITEMS_BY_ID||{})[it.id]=it;
+  if(it.platform==="抖音") return renderDouyinCard(it);
+  const img=firstImg(it.media_urls);
+  const isPrompt=it.is_prompt;
+  const title=(it.content||"").split("\n")[0].slice(0,60);
+  let cover;
+  if(img){
+    cover=`<div class="cover"><img loading="lazy" src="${esc(img)}" onerror="this.parentElement.outerHTML='<div class=\\'cover txt ${gradClass(title)}\\'><div class=\\'big\\'>'+this.dataset.t+'</div></div>'" data-t="${esc(title)}">
+      <div class="badges"><span class="badge pf">${esc(it.platform)}</span>${it.category?`<span class="badge cat">${esc(it.category)}</span>`:""}</div>
+      ${isPrompt?'<span class="badge rec">提示词</span>':''}</div>`;
+  }else{
+    cover=`<div class="cover txt ${gradClass(title)}">
+      <div class="big">${esc(title)}</div>
+      <div class="badges"><span class="badge pf">${esc(it.platform)}</span>${it.category?`<span class="badge cat">${esc(it.category)}</span>`:""}</div>
+      ${isPrompt?'<span class="badge rec">提示词</span>':''}</div>`;
+  }
+  const showT=/[a-zA-Z]/.test(it.content||"")&&(it.content.match(/[a-zA-Z]/g)||[]).length>15;
+  const transBox=it.translation_zh?`<div class="trans" id="tr-${it.id}"><b>译：</b>${esc(it.translation_zh)}</div>`:`<div class="trans" id="tr-${it.id}" style="display:none"></div>`;
+  return `<div class="card">
+    ${cover}
+    <div class="body">
+      <div class="meta"><span class="av">${esc(initial(it.author_name))}</span>
+        <span class="nm">${esc(it.author_name||"匿名")}</span>
+        <span>·</span><span>${fmtTime(it.publish_time)}</span></div>
+      <div class="text">${esc(it.content)}</div>
+      ${transBox}
+      <div class="foot">
+        <span>❤ ${it.like_count||0}</span><span>💬 ${it.comment_count||0}</span>
+        ${showT?`<span class="tbtn" id="tb-${it.id}" onclick="doTranslate(${it.id})">${it.translation_zh?"":"🌐 翻译"}</span>`:""}
+        ${it.source_url?`<a class="src" href="${esc(it.source_url)}" target="_blank" style="${showT?'':'margin-left:auto'}">原文 ↗</a>`:""}
+        <span class="delbtn" onclick="delCard(${it.id},this)" title="删除">🗑</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderDouyinCard(it){
+  const status=it.status||"完成";
+  const isDone=status==="完成";
+  const isFail=status==="失败";
+  const statusBadge=isDone?'':`<span class="dy-status ${isFail?'fail':'ing'}">${isFail?'❌ 失败':'⏳ 处理中'}</span>`;
+  const title=(it.title||(it.content||"").split("\n")[0]||"抖音视频").slice(0,50);
+  return `<div class="card dy-card" data-status="${esc(status)}">
+    <div class="cover txt ${gradClass(title)}" style="height:120px">
+      <div class="big" style="font-size:16px">${esc(title)}</div>
+      <div class="badges"><span class="badge pf" style="background:rgba(254,44,85,.95)">抖音</span></div>
+      ${statusBadge}
+    </div>
+    <div class="body">
+      <div class="meta"><span class="av" style="background:linear-gradient(135deg,#fe2c55,#ff6b9d)">${esc(initial(it.author_name||"抖"))}</span>
+        <span class="nm">${esc(it.author_name||"抖音")}</span>
+        <span>·</span><span>${fmtTime(it.publish_time)}</span></div>
+      <div class="text dy-text" id="dytext-${it.id}">${esc(it.content)}</div>
+      ${isDone?`<button class="dy-expand" onclick="toggleDyText(${it.id},this)">展开全文</button>`:''}
+      <div class="foot dy-foot">
+        ${isDone?`
+          <button class="dy-dl" onclick="dyDownload(${it.id},'video')">⬇ 视频</button>
+          <button class="dy-dl" onclick="dyDownload(${it.id},'audio')">⬇ 音频</button>
+          <button class="dy-dl" onclick="dyDownload(${it.id},'text')">⬇ 文本</button>
+          <button class="dy-dl copy" onclick="dyCopyText(${it.id},this)">复制文本</button>
+        `:isFail?`<span style="color:#f5576c">解析失败，可重新添加</span>`
+          :`<span style="color:var(--gold)">⏳ 正在下载+转字幕，稍后自动出现…</span>`}
+        <span class="delbtn" onclick="delCard(${it.id},this)" title="删除">🗑</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleDyText(id,btn){
+  const el=document.getElementById("dytext-"+id);
+  if(!el)return;
+  const expanded=el.classList.toggle("expanded");
+  btn.textContent=expanded?"收起":"展开全文";
+}
+function dyDownload(id,kind){window.location.href=`/api/douyin/download?item_id=${id}&kind=${kind}`;}
+async function dyCopyText(id,btn){
+  const el=document.getElementById("dytext-"+id);
+  const text=el?el.textContent:"";
+  copyText(text).then(()=>{btn.textContent="已复制";setTimeout(()=>btn.textContent="复制文本",1500)}).catch(()=>btn.textContent="复制失败");
+}
+
+async function doTranslate(id){
+  const btn=document.getElementById("tb-"+id),box=document.getElementById("tr-"+id);
+  if(!btn)return;btn.textContent="翻译中…";btn.style.pointerEvents="none";
+  try{
+    const r=await fetch("/api/translate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item_id:id})});
+    const d=await r.json();
+    if(d.translation){box.innerHTML=`<b>译：</b>${esc(d.translation)}`;box.style.display="block";btn.textContent="";}
+    else{btn.textContent="🌐 翻译";btn.style.pointerEvents="auto";}
+  }catch(e){btn.textContent="🌐 翻译";btn.style.pointerEvents="auto";}
+}
+
+// —— 抖音添加弹窗 ——
+function openDy(){document.getElementById("dyModal").classList.add("show")}
+function closeDy(){document.getElementById("dyModal").classList.remove("show")}
+async function submitDy(){
+  const share=document.getElementById("dyInput").value.trim();
+  const sub=document.getElementById("dySub").checked;
+  const status=document.getElementById("dyStatus"),btn=document.getElementById("dyGo");
+  if(!share){status.textContent="请先粘贴抖音链接";return}
+  btn.disabled=true;btn.textContent="提交中…";
+  status.innerHTML="提交中…";
+  try{
+    const r=await fetch("/api/add_douyin",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({share_text:share,subtitle:sub})});
+    const d=await r.json();
+    if(d.ok){
+      status.innerHTML=`✅ 已加入后台处理！正在下载视频`+(sub?"并转字幕":"")+`（约1-3分钟）。<br>处理完会自动出现在下方列表，期间可关闭此窗口。`;
+      document.getElementById("dyInput").value="";
+      pollDouyin(d.item_id);
+      setTimeout(()=>{closeDy();reset();},2000);
+    }else{status.innerHTML="❌ "+esc(d.error||"提交失败");}
+  }catch(e){status.innerHTML="❌ 请求失败："+esc(e.message);}
+  btn.disabled=false;btn.textContent="开始解析";
+}
+
+function pollDouyin(itemId){
+  let tries=0;
+  const timer=setInterval(async()=>{
+    tries++;
+    if(tries>60){clearInterval(timer);return}
+    try{
+      const d=await(await fetch("/api/items?platform=%E6%8A%96%E9%9F%B3&page=1")).json();
+      const item=(d.items||[]).find(x=>x.id===itemId);
+      if(item&&item.status&&item.status!=="处理中"){clearInterval(timer);reset();}
+    }catch(e){}
+  },5000);
+}
+
+document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")reset()});
+loadStats();load();
+</script>
+{% endblock %}

@@ -1,0 +1,785 @@
+{% extends "base.html" %}
+{% block title %}链接分析 · 提示词采集站{% endblock %}
+{% block nav_link %}active{% endblock %}
+
+{% block html_class %}bubble-theme{% endblock %}
+{% block body_class %}bubble-app{% endblock %}
+{% block brand_title %}Prompt <b>Crawler</b>{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='bubble/bubble.css') }}">{% endblock %}
+
+{% block content %}
+<div class="workspace-intro">
+<section class="hero">
+  <div class="hero-kicker"><span>COLLECT. EXPLORE. CREATE.</span><b id="localAiLabel">本地 AI</b></div>
+  <h1>把链接，<span>变成创作素材。</span></h1>
+  <p class="sub">留下值得研究的画面。提取视频、字幕和关键帧，<br>把每一次灵感整理成可回看的素材报告。</p>
+  <div class="composer">
+    <div class="composer-top"><span>从一个链接开始</span><span class="composer-state" id="composerState">等待你的灵感</span></div>
+    <textarea id="urlInput" aria-label="素材链接" placeholder="粘贴链接或分享文案，开始收集灵感…"></textarea>
+    <div class="composer-foot">
+      <span class="composer-hint">抖音 / B站 / 图文 / 网页 <span class="composer-shortcut"><kbd>Ctrl + Enter</kbd> 快速解析</span></span>
+      <div class="compose-actions">
+        <input id="referenceImages" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="submitReferenceImages()">
+        <button class="btn primary action-tile" id="parseBtn" onclick="submitAction('parse')" aria-label="解析素材">
+          <img class="action-icon" src="{{ url_for('static',filename='bubble/icons/link-simple.svg') }}" alt=""><span><b>解析素材</b><small>收集画面与文字</small></span><img class="action-arrow" src="{{ url_for('static',filename='bubble/icons/arrow-up-right.svg') }}" alt="">
+        </button>
+        <button class="btn action-tile" id="lapianBtn" onclick="submitAction('lapian')" aria-label="逐镜拉片">
+          <img class="action-icon" src="{{ url_for('static',filename='bubble/icons/film-strip.svg') }}" alt=""><span><b>逐镜拉片</b><small>读懂每一个镜头</small></span><img class="action-arrow" src="{{ url_for('static',filename='bubble/icons/arrow-up-right.svg') }}" alt="">
+        </button>
+        <button class="btn action-tile" id="reverseBtn" type="button" aria-label="反推提示词" title="有链接时反推首帧；无链接时选择本地图片" onclick="submitReverse()">
+          <img class="action-icon" src="{{ url_for('static',filename='bubble/icons/magic-wand.svg') }}" alt=""><span><b>反推提示词</b><small>拆解画面的灵感</small></span><img class="action-arrow" src="{{ url_for('static',filename='bubble/icons/arrow-up-right.svg') }}" alt="">
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="hero-status" id="status" role="status" aria-live="polite"></div>
+</section>
+<aside class="workspace-art" aria-label="泡泡灵感伙伴">
+  {% include '_bubble_art.html' %}
+</aside>
+</div>
+
+<section class="showcase" id="showcase">
+  <div class="metric"><div class="num" id="totalNum">0</div><div class="label">当前记录</div></div>
+  <div class="metric"><div class="num" id="doneNum">0</div><div class="label">已完成</div></div>
+  <div class="metric"><div class="num" id="lapianNum">0</div><div class="label">拉片稿</div></div>
+</section>
+
+<section class="channel-strip" aria-label="素材频道">
+  <button class="active" type="button" onclick="setQuickFilter('all','',this)">全部</button>
+  <button type="button" onclick="setQuickFilter('platform','抖音',this)">抖音</button>
+  <button type="button" onclick="setQuickFilter('platform','B站',this)">B站</button>
+  <button type="button" onclick="setQuickFilter('type','拉片',this)">拉片</button>
+  <button type="button" onclick="setQuickFilter('type','提示词反推',this)">反推</button>
+  <button type="button" onclick="setQuickFilter('type','视频',this)">视频</button>
+  <button type="button" onclick="setQuickFilter('type','图文',this)">图文</button>
+  <button type="button" onclick="setQuickFilter('category','运镜',this)">运镜</button>
+  <button type="button" onclick="setQuickFilter('category','分镜',this)">分镜</button>
+</section>
+
+<section class="discovery" id="discoveryPanel">
+  <div class="discovery-head">
+    <div>
+      <h2>素材精选</h2>
+      <p>最近留下的画面，或许就是下一次创作的起点。</p>
+    </div>
+    <button class="btn refresh-action" type="button" onclick="loadFeed()"><img src="{{ url_for('static',filename='bubble/icons/arrow-clockwise.svg') }}" alt="">刷新素材</button>
+  </div>
+  <div class="discovery-grid" id="discoveryGrid"></div>
+</section>
+
+<section>
+  <div class="feed-head">
+    <h2>提取记录 <span class="count" id="feedCnt"></span></h2>
+    <button class="btn refresh-action" onclick="loadFeed()"><img src="{{ url_for('static',filename='bubble/icons/arrow-clockwise.svg') }}" alt="">刷新</button>
+  </div>
+  <div class="filters">
+    <input id="filterQ" aria-label="搜索提取记录" placeholder="搜索你的灵感库…" oninput="debouncedLoadFeed()">
+    <select id="filterPlatform" aria-label="筛选平台" onchange="loadFeed()">
+      <option value="">全部平台</option>
+      <option>抖音</option><option>B站</option><option>微信公众号</option><option>小红书</option><option>X</option><option>网页</option>
+    </select>
+    <select id="filterType" aria-label="筛选类型" onchange="loadFeed()">
+      <option value="">全部类型</option>
+      <option>提示词反推</option><option>拉片</option><option>视频</option><option>图文</option><option>链接提取</option>
+    </select>
+    <select id="filterCategory" aria-label="筛选分类" onchange="loadFeed()">
+      <option value="">全部AI分类</option>
+    </select>
+    <button class="btn" onclick="resetFilters()">清空</button>
+  </div>
+  <div class="feed" id="feedList"></div>
+</section>
+
+<footer class="workspace-foot"><span>Prompt Crawler · 为每一次创作积累灵感</span></footer>
+<div class="modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" id="reportModal" onclick="if(event.target===this)closeReport()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="reportTitle">素材报告</h2>
+      <button class="btn danger" onclick="closeReport()">关闭</button>
+    </div>
+    <div class="modal-body" id="reportBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='bubble/bubble.js') }}" defer></script>
+<script>
+let FEED_CACHE={};
+let FEED_ITEMS=[];
+let VISIBLE_COUNT=0;
+let FEED_QUERY_KEY="";
+const FEED_BATCH=18;
+let asyncPollTimer=null;
+let feedFilterTimer=null;
+
+function statusBadge(status){
+  if(status==="完成")return "ok";
+  if(status==="失败")return "fail";
+  if(status==="处理中")return "work";
+  return "";
+}
+function platformName(it){return it.platform||"网页";}
+function isBili(it){return platformName(it)==="B站";}
+function isDouyin(it){return platformName(it)==="抖音";}
+function isReference(it){return platformName(it)==="本地上传";}
+function itemMode(it){return it.content_type==="提示词反推" ? "反推" : (it.content_type==="拉片" ? "拉片" : "解析");}
+function canLapian(it){return (isBili(it)||isDouyin(it)) && it.content_type!=="提示词反推" && it.has_video && it.status==="完成";}
+function lapianButtonText(it){return it.content_type==="拉片" ? "重新拉片" : "补拉片";}
+function extractSectionText(content,name){
+  const text=content||"";
+  const marker=`【${name}】`;
+  const start=text.indexOf(marker);
+  if(start<0)return "";
+  const tail=text.slice(start+marker.length).trim();
+  if(["拉片分析","画面内容分析","文生图/首帧图反推提示词"].includes(name))return tail;
+  if(["视频图文信息提取","图片图文信息提取"].includes(name))return tail.split(/【(?:画面内容分析|拉片分析|文生图\/首帧图反推提示词)】/)[0].trim();
+  const next=tail.search(/\n\n【[^】]+】/);
+  return (next>=0?tail.slice(0,next):tail).trim();
+}
+function extractPromptPart(text,name,nextNames=[]){
+  const marker=`【${name}】`;
+  const start=(text||"").indexOf(marker);
+  if(start<0)return "";
+  const bodyStart=start+marker.length;
+  let end=(text||"").length;
+  nextNames.forEach(nextName=>{
+    const pos=(text||"").indexOf(`【${nextName}】`,bodyStart);
+    if(pos>=0&&pos<end)end=pos;
+  });
+  return (text||"").slice(bodyStart,end).trim();
+}
+function safeMjParams(text){
+  const value=String(text||"").replace(/```[a-z]*|```|\*\*|`/gi," ").replace(/\s+/g," ").trim();
+  const patterns=[/--ar\s+\d{1,3}\s*[:/]\s*\d{1,3}/i,/--style\s+raw\b/i,/--stylize\s+\d{1,4}\b/i,/--chaos\s+\d{1,3}\b/i];
+  return patterns.map(pattern=>(value.match(pattern)||[])[0]||"").filter(Boolean).map(token=>token.toLowerCase().replace(/\s*[:/]\s*/,":").replace(/\s+/g," ")).join(" ");
+}
+function truncatePrompt(text,limit){
+  let value=String(text||"").replace(/```[a-z]*|```|\*\*|`/gi," ").replace(/^\s*(prompt|midjourney prompt|mj prompt)\s*[:：]\s*/i,"").replace(/\s+/g," ").replace(/^[,;\s]+|[,;.\s]+$/g,"");
+  if(value.length<=limit)return value;
+  let candidate=value.slice(0,limit).replace(/[,;.\s]+$/g,"");
+  const boundary=Math.max(candidate.lastIndexOf(","),candidate.lastIndexOf(";"),candidate.lastIndexOf("."));
+  if(boundary>=Math.floor(limit*.72))candidate=candidate.slice(0,boundary);
+  else{
+    const space=candidate.lastIndexOf(" ");
+    if(space>=Math.floor(limit*.85))candidate=candidate.slice(0,space);
+  }
+  return candidate.replace(/[,;.\s]+$/g,"");
+}
+function safeMjCopy(body,params){
+  const safeParamsText=safeMjParams(params);
+  const bodyLimit=Math.min(820,900-safeParamsText.length-(safeParamsText?1:0));
+  const safeBody=truncatePrompt(body,Math.max(200,bodyLimit));
+  return `${safeBody}${safeParamsText?` ${safeParamsText}`:""}`.trim();
+}
+function characterAssetsFromReport(raw){
+  const section=extractPromptPart(raw,"角色资产图 MJ 提示词",["视频分镜头提示词","负面约束","事实与推断边界"]);
+  if(!section)return [];
+  return section.split(/(?=^###\s*角色\s*\d+)/gm).map(block=>block.trim()).filter(block=>/^###\s*角色\s*\d+/m.test(block)).map((block,index)=>{
+    const label=(block.match(/^###\s*([^\n]+)$/m)?.[1]||`角色${index+1}`).trim();
+    const anchor=(block.match(/角色锚点\s*[:：]\s*([\s\S]*?)(?=\n\s*MJ_PROMPT\s*[:：])/i)?.[1]||"").trim();
+    const prompt=(block.match(/MJ_PROMPT\s*[:：]\s*([\s\S]*?)(?=\n\s*MJ_PARAMS\s*[:：])/i)?.[1]||"").trim();
+    const params=(block.match(/MJ_PARAMS\s*[:：]\s*([^\n]*)/i)?.[1]||"").trim();
+    return {label,anchor,prompt,params,mjCopy:safeMjCopy(prompt,params),raw:block};
+  }).filter(asset=>asset.mjCopy);
+}
+function storyboardFromReport(raw){
+  const section=extractPromptPart(raw,"视频分镜头提示词",["负面约束","事实与推断边界"]);
+  if(!section)return {intro:"",shots:[]};
+  const firstShot=section.search(/^###\s*镜头\s*\d+/m);
+  const intro=(firstShot>=0?section.slice(0,firstShot):section).trim();
+  const shotText=firstShot>=0?section.slice(firstShot):"";
+  const shots=shotText.split(/(?=^###\s*镜头\s*\d+)/gm).map(block=>block.trim()).filter(Boolean).map((block,index)=>{
+    const label=(block.match(/^###\s*([^\n]+)$/m)?.[1]||`镜头${index+1}`).trim();
+    const match=block.match(/\n\s*SHOT_PROMPT\s*[:：]\s*([\s\S]*)$/i);
+    const prompt=(match?.[1]||"").trim();
+    const detail=(match?block.slice(0,match.index):block).replace(/^###\s*[^\n]+\n?/m,"").trim();
+    return {label,detail,prompt,raw:block};
+  }).filter(shot=>shot.prompt);
+  return {intro,shots};
+}
+function reversePromptGroups(text){
+  const chunks=String(text||"").split(/\n\s*---\s*\n(?=##\s+(?!【))/g).filter(chunk=>chunk.trim());
+  return chunks.map((raw,index)=>{
+    const labelMatch=raw.match(/^##\s+([^\n]+)$/m);
+    const mj=extractPromptPart(raw,"Midjourney（MJ）英文提示词",["MJ 参数建议"]);
+    const params=extractPromptPart(raw,"MJ 参数建议",["GPT 文生图中文提示词"]);
+    const gpt=extractPromptPart(raw,"GPT 文生图中文提示词",["角色资产图 MJ 提示词","视频分镜头提示词","负面约束","事实与推断边界"]);
+    const assets=characterAssetsFromReport(raw);
+    const storyboard=storyboardFromReport(raw);
+    return {label:(labelMatch?.[1]||`参考图${index+1}`).trim(),mj,params,gpt,mjCopy:safeMjCopy(mj,params),assets,storyboardIntro:storyboard.intro,shots:storyboard.shots,raw:raw.trim()};
+  }).filter(group=>group.mjCopy||group.gpt||group.assets.length||group.shots.length);
+}
+function reversePromptHtml(it,reverseText){
+  return reversePromptGroups(reverseText).map((group,index)=>`
+    <section class="rp-sec">
+      <h3>${esc(group.label)} · 首帧图 MJ 提示词（${group.mjCopy.length}/1024）</h3>
+      <pre class="rp-box rp-green">${esc(group.mjCopy)}</pre>
+      <div class="actions"><button class="btn green" onclick="copyReversePart(${it.id},${index},'mj')">复制首帧 MJ</button></div>
+      <h3>首帧图 GPT 文生图提示词</h3>
+      <pre class="rp-box">${esc(group.gpt)}</pre>
+      <div class="actions"><button class="btn" onclick="copyReversePart(${it.id},${index},'gpt')">复制首帧 GPT</button></div>
+      ${group.assets.length?`<div class="rp-divider"><b>角色资产图 MJ</b><span>每个角色独立生成，已按 AiMJ v8 安全长度处理</span></div>${group.assets.map((asset,assetIndex)=>`
+        <section class="rp-nested rp-asset">
+          <h3>${esc(asset.label)}（${asset.mjCopy.length}/1024）</h3>
+          ${asset.anchor?`<div class="rp-note"><b>角色锚点：</b>${esc(asset.anchor)}</div>`:""}
+          <pre class="rp-box rp-green">${esc(asset.mjCopy)}</pre>
+          <div class="actions"><button class="btn green" onclick="copyReversePart(${it.id},${index},'asset',${assetIndex})">复制该角色资产 MJ</button></div>
+        </section>`).join("")}`:""}
+      ${group.shots.length?`<div class="rp-divider"><b>视频分镜头提示词</b><span>${group.shots.length} 个连续镜头，可逐镜头复制</span></div>
+        ${group.storyboardIntro?`<div class="rp-note">${esc(group.storyboardIntro)}</div>`:""}
+        <div class="actions"><button class="btn green" onclick="copyReversePart(${it.id},${index},'shots')">复制全部分镜提示词</button></div>
+        ${group.shots.map((shot,shotIndex)=>`<details class="rp-shot">
+          <summary>${esc(shot.label)}</summary>
+          ${shot.detail?`<pre class="rp-box">${esc(shot.detail)}</pre>`:""}
+          <pre class="rp-box rp-lapian">${esc(shot.prompt)}</pre>
+          <div class="actions"><button class="btn" onclick="copyReversePart(${it.id},${index},'shot',${shotIndex})">复制该镜头提示词</button></div>
+        </details>`).join("")}`:""}
+      <details><summary>查看完整视觉拆解与事实边界</summary><pre class="rp-box">${esc(group.raw)}</pre></details>
+    </section>`).join("");
+}
+function graphicInfoText(it){
+  const content=it?.content||"";
+  return extractSectionText(content,"视频图文信息提取")
+    || extractSectionText(content,"图片图文信息提取")
+    || extractSectionText(content,"图片提示词");
+}
+function assetEndpoint(it,kind){
+  if(isBili(it))return `/api/bilibili/download?item_id=${it.id}&kind=${kind}`;
+  if(isDouyin(it))return `/api/douyin/download?item_id=${it.id}&kind=${kind}`;
+  if(isReference(it))return `/api/reference/download?item_id=${it.id}&kind=${kind}`;
+  if(kind==="report")return `/api/extract/report?id=${it.id}`;
+  return "";
+}
+function downloadAsset(id,kind){
+  const it=FEED_CACHE[id];
+  if(!it)return toast("数据未加载");
+  const url=assetEndpoint(it,kind);
+  if(!url)return toast("该平台暂不支持此下载");
+  window.location.href=url;
+}
+
+function setQuickFilter(kind,value,btn){
+  const map={
+    platform:"filterPlatform",
+    type:"filterType",
+    category:"filterCategory"
+  };
+  if(kind==="all"){
+    resetFilters();
+  }else{
+    Object.values(map).forEach(id=>{
+      const el=document.getElementById(id);
+      if(el)el.value="";
+    });
+    const target=document.getElementById(map[kind]);
+    if(target){
+      if(value && ![...target.options].some(o=>o.value===value || o.textContent===value)){
+        target.add(new Option(value,value));
+      }
+      target.value=value;
+    }
+    loadFeed();
+  }
+  document.querySelectorAll(".channel-strip button").forEach(x=>x.classList.remove("active"));
+  if(btn)btn.classList.add("active");
+}
+
+function coverUrl(it){
+  return (it.image_urls||[]).find(Boolean)||"";
+}
+function frameTimeLabel(it,index){
+  const entry=(it.frame_manifest||[])[index];
+  if(!entry)return "";
+  const ids=[...new Set((it.frame_manifest||[]).map(frame=>frame.shot_id).filter(Boolean))];
+  const shot=entry.shot_id?` · 镜头${ids.indexOf(entry.shot_id)+1}`:"";
+  return `${entry.timecode||""}${shot}`.trim();
+}
+function frameThumbHtml(it,u,index,compact=false){
+  const label=frameTimeLabel(it,index);
+  return `<div class="frame-thumb">
+    <img src="${esc(u)}" alt="${esc(label||`素材图片 ${index+1}`)}" loading="lazy" ${compact?'decoding="async"':''} onerror="this.closest('.frame-thumb').remove()" onclick="window.open('${esc(u)}','_blank')">
+    ${label?`<span class="frame-time">${esc(label)}</span>`:""}
+  </div>`;
+}
+
+function mediaCardHtml(it,big=false,featureCovers=[]){
+  const cover=coverUrl(it);
+  const platform=platformName(it);
+  const mode=itemMode(it);
+  const title=it.title||"(无标题)";
+  const poster=cover
+    ? `<div class="media-poster" style="background-image:url(&quot;${esc(cover)}&quot;)"></div>`
+    : `<div class="media-poster no-img"></div>`;
+  const mosaic=(big && featureCovers.length)
+    ? `<div class="feature-mosaic">${featureCovers.slice(0,4).map(u=>`<img src="${esc(u)}" loading="lazy" alt="" onerror="this.remove()">`).join("")}</div>`
+    : "";
+  return `<article role="button" tabindex="0" aria-label="查看报告：${esc(title)}" class="${big?"feature-card":"mini-card"}${mosaic?" has-mosaic":""}${cover?"":" no-img"}" onclick="openReport(${it.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openReport(${it.id})}">
+    ${poster}
+    ${mosaic}
+    <div class="media-shade"></div>
+    ${big?`<div class="media-dots"><span></span><span></span><span></span><span></span></div>`:""}
+    <div class="media-info">
+      <div class="row">
+        <span class="badge">${esc(platform)}</span>
+        ${it.content_type?`<span class="badge type">${esc(it.content_type)}</span>`:""}
+        ${it.status?`<span class="badge ${statusBadge(it.status)}">${esc(it.status)}</span>`:""}
+      </div>
+      <div class="media-title">${esc(title)}</div>
+      <div class="media-meta">
+        <span>${esc(mode)}</span>
+        ${it.author_name?`<span>${esc(it.author_name)}</span>`:""}
+        ${it.quality_score>0?`<span>${it.quality_score} 分</span>`:""}
+      </div>
+    </div>
+  </article>`;
+}
+
+function renderDiscovery(items){
+  const grid=document.getElementById("discoveryGrid");
+  if(!grid)return;
+  const ranked=[...items].sort((a,b)=>{
+    const ac=coverUrl(a)?1:0;
+    const bc=coverUrl(b)?1:0;
+    if(ac!==bc)return bc-ac;
+    const ai=(a.quality_score||0)+(a.is_prompt?1:0);
+    const bi=(b.quality_score||0)+(b.is_prompt?1:0);
+    return bi-ai;
+  }).slice(0,5);
+  if(!ranked.length){
+    grid.innerHTML=`<div class="empty">暂无可展示的精选素材。解析几条带封面或关键帧的链接后，这里会自动生成视频门户式精选区。</div>`;
+    return;
+  }
+  const [first,...rest]=ranked;
+  const featureCovers=ranked.map(coverUrl).filter(Boolean);
+  grid.innerHTML=`
+    ${mediaCardHtml(first,true,featureCovers)}
+    <div class="mini-grid">${rest.map(it=>mediaCardHtml(it,false)).join("")}</div>
+  `;
+}
+
+function cardHtml(it){
+  const isWorking=it.status==="处理中";
+  const lapianText=extractSectionText(it.content||"","拉片分析");
+  const lapianBrief=lapianText ? lapianText.replace(/\s+/g," ").slice(0,220) : "";
+  const visualText=extractSectionText(it.content||"","画面内容分析");
+  const visualBrief=visualText ? visualText.replace(/\s+/g," ").slice(0,220) : "";
+  const reverseText=extractSectionText(it.content||"","文生图/首帧图反推提示词");
+  const reverseGroup=reverseText?reversePromptGroups(reverseText)[0]:null;
+  const hasPrompt=Boolean(reverseText || (it.is_prompt==1 && (it.prompt_text||"").trim()));
+  const reverseBrief=reverseText ? reverseText.replace(/\s+/g," ").slice(0,260) : "";
+  const graphicText=graphicInfoText(it);
+  const graphicBrief=graphicText ? graphicText.replace(/\s+/g," ").slice(0,260) : "";
+  const imgs=(it.image_urls||[]).slice(0,4).map((u,index)=>frameThumbHtml(it,u,index,true)).join("");
+  const promptBlock=hasPrompt&&!reverseText?`
+    <div class="prompt">
+      <div class="label">提取出的提示词${it.prompt_lang?` · ${esc(it.prompt_lang)}`:""}</div>
+      <pre id="pt-${it.id}">${esc(it.prompt_text)}</pre>
+    </div>`:"";
+  const assetButtons=(isBili(it)||isDouyin(it)||isReference(it))?`
+    <button class="btn" onclick="downloadAsset(${it.id},'text')">下载文本</button>
+    ${it.has_video?`<button class="btn" onclick="downloadAsset(${it.id},'video')">下载视频</button>`:""}
+    ${it.has_audio?`<button class="btn" onclick="downloadAsset(${it.id},'audio')">下载音频</button>`:""}
+    ${it.has_subtitles?`<button class="btn" onclick="downloadAsset(${it.id},'srt')">下载字幕(SRT)</button>`:""}
+    ${it.has_images?`<button class="btn" onclick="downloadAsset(${it.id},'images')">下载图片/关键帧</button>`:""}
+    ${isBili(it)&&it.has_frames?`<button class="btn" onclick="downloadAsset(${it.id},'frames')">下载关键帧</button>`:""}
+  `:"";
+  return `<article class="card" data-id="${it.id}">
+    <div class="row badges">
+      <span class="badge">${esc(platformName(it))}</span>
+      ${it.status?`<span class="badge ${statusBadge(it.status)}">${esc(it.status)}</span>`:""}
+      ${it.content_type?`<span class="badge type">${esc(it.content_type)}</span>`:""}
+      ${hasPrompt?`<span class="badge ok">含提示词</span>`:`<span class="badge">无提示词</span>`}
+      ${it.quality_score>0?`<span class="badge type">${it.quality_score}分</span>`:""}
+    </div>
+    <div class="title" onclick="openReport(${it.id})">${esc(it.title||"(无标题)")}</div>
+    <div class="meta">
+      ${it.author_name?`<span>作者：${esc(it.author_name)}</span>`:""}
+      ${it.owner_display_name?`<span>用户：${esc(it.owner_display_name)}</span>`:""}
+      ${it.publish_time?`<span>发布：${esc(it.publish_time)}</span>`:""}
+      ${it.crawled_at?`<span>解析：${fmtTime(it.crawled_at)}</span>`:""}
+      ${it.frame_count?`<span>时间轴证据帧 ${it.frame_count} 张</span>`:""}
+      ${it.content?`<span>正文 ${String(it.content||"").length} 字</span>`:""}
+    </div>
+    ${it.summary_zh?`<div class="summary">${esc(it.summary_zh)}</div>`:""}
+    ${graphicBrief?`<div class="lapian-brief"><div class="label">图文信息提取</div>${esc(graphicBrief)}${graphicText.length>260?"…":""}</div>`:""}
+    ${lapianBrief?`<div class="lapian-brief"><div class="label">拉片分析</div>${esc(lapianBrief)}${lapianText.length>220?"…":""}</div>`:""}
+    ${!lapianBrief&&visualBrief?`<div class="lapian-brief"><div class="label">画面内容分析</div>${esc(visualBrief)}${visualText.length>220?"…":""}</div>`:""}
+    ${reverseBrief?`<div class="lapian-brief"><div class="label">首帧图 + 角色资产 + 视频分镜反推</div>${esc(reverseBrief)}${reverseText.length>260?"…":""}</div>`:""}
+    ${promptBlock}
+    ${imgs?`<div class="thumbs">${imgs}</div>`:""}
+    <div class="actions">
+      <button class="btn primary" onclick="openReport(${it.id})">查看完整报告</button>
+      ${canLapian(it)?`<button class="btn green" onclick="requestLapian(${it.id},this)">${lapianButtonText(it)}</button>`:""}
+      <button class="btn" onclick="downloadAsset(${it.id},'report')">下载报告(Word)</button>
+      ${reverseText?`<button class="btn green" onclick="copyReversePart(${it.id},0,'mj')">复制首帧 MJ</button><button class="btn" onclick="copyReversePart(${it.id},0,'gpt')">复制首帧 GPT</button>${reverseGroup?.assets?.length?`<button class="btn green" onclick="copyReversePart(${it.id},0,'asset',0)">复制角色资产 MJ</button>`:""}${reverseGroup?.shots?.length?`<button class="btn" onclick="copyReversePart(${it.id},0,'shots')">复制全部分镜</button>`:""}`:(hasPrompt?`<button class="btn green" onclick="copyPrompt(${it.id})">复制提示词</button>`:"")}
+      ${assetButtons}
+      ${isWorking?`<button class="btn" onclick="submitAgain(${it.id})">任务处理中</button>`:""}
+      ${it.status==="失败"&&it.source_url?`<button class="btn green" onclick="retryRecord(${it.id},this)">重新解析</button>`:""}
+      ${it.source_url?`<a class="btn source" href="${esc(it.source_url)}" target="_blank">原链接</a>`:""}
+      <button class="btn danger" onclick="deleteRecord(${it.id},this)">删除</button>
+    </div>
+  </article>`;
+}
+
+function renderFeedList(){
+  const list=document.getElementById("feedList");
+  if(!list)return;
+  const total=FEED_ITEMS.length;
+  if(!total){
+    list.innerHTML=`<div class="empty">还没有记录。粘贴平台链接后选择“解析”“拉片”或“反推”；无链接时点“反推”可上传图片。</div>`;
+    return;
+  }
+  const visible=FEED_ITEMS.slice(0,VISIBLE_COUNT);
+  const more=VISIBLE_COUNT<total?`
+    <div class="feed-more">
+      <button class="btn" type="button" onclick="loadMoreFeed()">加载更多 ${VISIBLE_COUNT}/${total}</button>
+    </div>`:"";
+  list.innerHTML=visible.map(cardHtml).join("")+more;
+}
+
+function loadMoreFeed(){
+  VISIBLE_COUNT=Math.min(FEED_ITEMS.length,VISIBLE_COUNT+FEED_BATCH);
+  renderFeedList();
+}
+
+let reportPreviousFocus=null;
+function openReport(id){
+  const it=FEED_CACHE[id];
+  if(!it)return toast("数据未加载");
+  const lapianText=extractSectionText(it.content||"","拉片分析");
+  const visualText=extractSectionText(it.content||"","画面内容分析");
+  const reverseText=extractSectionText(it.content||"","文生图/首帧图反推提示词");
+  const reverseGroup=reverseText?reversePromptGroups(reverseText)[0]:null;
+  const hasPrompt=Boolean(reverseText || (it.is_prompt==1 && (it.prompt_text||"").trim()));
+  const graphicText=graphicInfoText(it);
+  const imgs=(it.image_urls||[]).map((u,index)=>frameThumbHtml(it,u,index,false)).join("");
+  const rows=[
+    ["平台",platformName(it)],
+    ["状态",it.status||""],
+    ["类型",it.content_type||""],
+    ["标题",it.title||""],
+    ["作者",it.author_name||""],
+    ["发布时间",it.publish_time||""],
+    ["模式",itemMode(it)],
+    ["时间轴证据帧",it.frame_count?`${it.frame_count} 张（带时间码）`:""],
+    ["是否含提示词",hasPrompt?"是":"否"],
+    ["分类",it.category||""],
+    ["质量评分",it.quality_score?`${it.quality_score} 分`:""],
+    ["原链接",it.source_url||""],
+  ].filter(r=>r[1]);
+  document.getElementById("reportTitle").textContent=it.title||"素材报告";
+  document.getElementById("reportBody").innerHTML=`
+    <table class="rp-table">${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(String(r[1]))}</td></tr>`).join("")}</table>
+    ${it.summary_zh?`<section class="rp-sec"><h3>AI 摘要</h3><div class="rp-box">${esc(it.summary_zh)}</div></section>`:""}
+    ${it.reason?`<section class="rp-sec"><h3>AI 判定理由</h3><div class="rp-box">${esc(it.reason)}</div></section>`:""}
+    ${hasPrompt&&!reverseText?`<section class="rp-sec"><h3>提取出的提示词</h3><pre class="rp-box rp-green">${esc(it.prompt_text)}</pre></section>`:""}
+    ${graphicText?`<section class="rp-sec"><h3>图文信息提取</h3><pre class="rp-box rp-green">${esc(graphicText)}</pre></section>`:""}
+    ${lapianText?`<section class="rp-sec"><h3>拉片分析</h3><pre class="rp-box rp-lapian">${esc(lapianText)}</pre></section>`:""}
+    ${!lapianText&&visualText?`<section class="rp-sec"><h3>画面内容分析</h3><pre class="rp-box rp-lapian">${esc(visualText)}</pre></section>`:""}
+    ${reverseText?reversePromptHtml(it,reverseText):""}
+    ${imgs?`<section class="rp-sec"><h3>${it.content_type==="提示词反推"?"反推参考图/首帧":"关键帧时间轴"}（${(it.image_urls||[]).length} 张）</h3><div class="rp-imgs">${imgs}</div></section>`:""}
+    <section class="rp-sec"><h3>完整正文</h3><pre class="rp-box">${esc(it.content||"(无正文)")}</pre></section>
+    <section class="rp-sec"><div class="actions">
+      <button class="btn" onclick="downloadAsset(${it.id},'report')">下载报告(Word)</button>
+      ${reverseText?`<button class="btn green" onclick="copyReversePart(${it.id},0,'mj')">复制第1张首帧 MJ</button><button class="btn" onclick="copyReversePart(${it.id},0,'gpt')">复制第1张首帧 GPT</button>${reverseGroup?.assets?.length?`<button class="btn green" onclick="copyReversePart(${it.id},0,'asset',0)">复制第1个角色资产 MJ</button>`:""}${reverseGroup?.shots?.length?`<button class="btn" onclick="copyReversePart(${it.id},0,'shots')">复制第1张全部分镜</button>`:""}`:(hasPrompt?`<button class="btn green" onclick="copyPrompt(${it.id})">复制提示词</button>`:"")}
+      ${canLapian(it)?`<button class="btn green" onclick="requestLapian(${it.id},this)">${lapianButtonText(it)}</button>`:""}
+      <button class="btn green" onclick="copyFull(${it.id})">复制全文</button>
+      ${(isBili(it)||isDouyin(it)||isReference(it))?`<button class="btn" onclick="downloadAsset(${it.id},'text')">下载文本</button>`:""}
+      ${it.has_video?`<button class="btn" onclick="downloadAsset(${it.id},'video')">下载视频</button>`:""}
+      ${it.has_audio?`<button class="btn" onclick="downloadAsset(${it.id},'audio')">下载音频</button>`:""}
+      ${it.has_subtitles?`<button class="btn" onclick="downloadAsset(${it.id},'srt')">下载字幕(SRT)</button>`:""}
+      ${it.has_images?`<button class="btn" onclick="downloadAsset(${it.id},'images')">下载图片/关键帧</button>`:""}
+      ${it.source_url?`<a class="btn" href="${esc(it.source_url)}" target="_blank">打开原链接</a>`:""}
+    </div></section>
+  `;
+  document.getElementById("reportModal").classList.add("show");
+  reportPreviousFocus=document.activeElement;
+  document.querySelector('#reportModal .modal-head button').focus();
+}
+function closeReport(){document.getElementById("reportModal").classList.remove("show");reportPreviousFocus?.focus();}
+document.addEventListener('keydown',event=>{
+  const modal=document.getElementById('reportModal');
+  if(!modal.classList.contains('show'))return;
+  if(event.key==='Escape')closeReport();
+  if(event.key==='Tab'){
+    const nodes=[...modal.querySelectorAll('button,a[href],summary,input,select,textarea')].filter(node=>node.getClientRects().length);
+    const first=nodes[0],last=nodes[nodes.length-1];
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  }
+});
+
+function copyPrompt(id){
+  const it=FEED_CACHE[id];
+  const text=extractSectionText(it?.content||"","文生图/首帧图反推提示词") || it?.prompt_text || "";
+  copyText(text).then(()=>toast("提示词已复制")).catch(()=>toast("复制失败"));
+}
+function copyReversePart(id,index,kind,subIndex=0){
+  const it=FEED_CACHE[id];
+  const reverseText=extractSectionText(it?.content||"","文生图/首帧图反推提示词");
+  const group=reversePromptGroups(reverseText)[index];
+  let text="";
+  let message="提示词已复制";
+  if(kind==="mj"){
+    text=group?.mjCopy||"";
+    message=`首帧 MJ 已复制（${text.length}/1024）`;
+  }else if(kind==="gpt"){
+    text=group?.gpt||"";
+    message="首帧 GPT 提示词已复制";
+  }else if(kind==="asset"){
+    text=group?.assets?.[subIndex]?.mjCopy||"";
+    message=`角色资产 MJ 已复制（${text.length}/1024）`;
+  }else if(kind==="shot"){
+    text=group?.shots?.[subIndex]?.prompt||"";
+    message=`镜头${subIndex+1}提示词已复制`;
+  }else if(kind==="shots"){
+    text=(group?.shots||[]).map(shot=>`【${shot.label}】\n${shot.prompt}`).join("\n\n");
+    message=`已复制 ${group?.shots?.length||0} 个分镜提示词`;
+  }
+  if(!text)return toast("没有找到对应提示词");
+  copyText(text).then(()=>toast(message)).catch(()=>toast("复制失败"));
+}
+function copyFull(id){
+  const it=FEED_CACHE[id];
+  copyText(it?.content||"").then(()=>toast("全文已复制")).catch(()=>toast("复制失败"));
+}
+
+async function submitReferenceImages(){
+  const input=document.getElementById("referenceImages");
+  const button=document.getElementById("reverseBtn");
+  const status=document.getElementById("status");
+  const files=[...(input.files||[])];
+  if(!files.length)return;
+  if(files.length>8){
+    status.textContent="一次最多上传 8 张参考图";
+    input.value="";
+    return;
+  }
+  const form=new FormData();
+  files.forEach(file=>form.append("images",file));
+  form.append("title",`参考图提示词反推（${files.length}张）`);
+  button.disabled=true;
+  status.innerHTML=`<span class="spin"></span>正在上传 ${files.length} 张参考图，并生成本地图像提示词草稿…`;
+  try{
+    const resp=await fetch("/api/reference/upload",{method:"POST",body:form});
+    const data=await resp.json();
+    if(data.ok){
+      status.textContent=`已上传 ${data.image_count||files.length} 张图片，本地图像提示词草稿正在后台生成。`;
+      startAsyncPoll();
+      await loadFeed();
+    }else{
+      status.textContent="上传失败："+(data.error||"未知错误");
+    }
+  }catch(e){
+    status.textContent="上传失败："+e.message;
+  }finally{
+    input.value="";
+    button.disabled=false;
+  }
+}
+
+function submitReverse(){
+  const url=document.getElementById("urlInput").value.trim();
+  if(url){
+    submitAction("reverse_prompt");
+  }else{
+    document.getElementById("referenceImages").click();
+  }
+}
+
+async function submitAction(mode){
+  const input=document.getElementById("urlInput");
+  const url=input.value.trim();
+  const status=document.getElementById("status");
+  const parseBtn=document.getElementById("parseBtn");
+  const lapianBtn=document.getElementById("lapianBtn");
+  const reverseBtn=document.getElementById("reverseBtn");
+  if(!url){status.textContent=mode==="reverse_prompt"?"请粘贴视频链接，或直接选择参考图片":"请先粘贴链接或分享文案";return;}
+  parseBtn.disabled=true;
+  lapianBtn.disabled=true;
+  reverseBtn.disabled=true;
+  const actionName=mode==="lapian"?"拉片":(mode==="reverse_prompt"?"反推":"解析");
+  const actionStatus=mode==="lapian"?"正在提交拉片任务，视频会先解析再生成拉片稿":(mode==="reverse_prompt"?"正在提取视频首帧并反推 MJ + GPT 两套提示词":"正在提交解析任务");
+  status.innerHTML=`<span class="spin"></span>${actionStatus}...`;
+  const feed=document.getElementById("feedList");
+  const tmp=document.createElement("div");
+  tmp.innerHTML=`<div class="card loading"><span class="spin"></span>${actionName}处理中：${esc(url.slice(0,80))}</div>`;
+  feed.prepend(tmp.firstChild);
+  try{
+    const resp=await fetch("/api/extract",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({url,mode})
+    });
+    const data=await resp.json();
+    if(data.ok){
+      input.value="";
+      status.textContent=data.async ? `${data.platform||"素材"}${actionName}任务已进入后台，完成后会自动刷新。` : `${actionName}完成。`;
+      startAsyncPoll();
+      await loadFeed();
+    }else{
+      status.textContent="提交失败：" + (data.error||"未知错误");
+      await loadFeed();
+    }
+  }catch(e){
+    status.textContent="请求失败：" + e.message;
+    await loadFeed();
+  }finally{
+    parseBtn.disabled=false;
+    lapianBtn.disabled=false;
+    reverseBtn.disabled=false;
+  }
+}
+
+async function requestLapian(id,btn){
+  const it=FEED_CACHE[id];
+  const status=document.getElementById("status");
+  if(!it)return toast("数据未加载");
+  if(!canLapian(it))return toast("这条记录暂时不能补拉片");
+  if(btn)btn.disabled=true;
+  status.innerHTML=`<span class="spin"></span>${lapianButtonText(it)}任务已提交，正在后台抽关键帧并生成拉片稿...`;
+  try{
+    const resp=await fetch("/api/extract/lapian",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id,force:true})
+    });
+    const data=await resp.json();
+    if(data.ok){
+      status.textContent="拉片任务已进入后台，完成后列表会自动刷新。";
+      startAsyncPoll();
+      await loadFeed();
+    }else{
+      status.textContent="补拉片失败：" + (data.error||"未知错误");
+      if(btn)btn.disabled=false;
+    }
+  }catch(e){
+    status.textContent="补拉片请求失败：" + e.message;
+    if(btn)btn.disabled=false;
+  }
+}
+
+async function loadFeed(){
+  const params=new URLSearchParams();
+  const q=document.getElementById("filterQ")?.value.trim();
+  const platform=document.getElementById("filterPlatform")?.value;
+  const type=document.getElementById("filterType")?.value;
+  const category=document.getElementById("filterCategory")?.value;
+  if(q)params.set("q",q);
+  if(platform)params.set("platform",platform);
+  if(type)params.set("content_type",type);
+  if(category)params.set("category",category);
+  const queryKey=params.toString();
+  const d=await (await fetch(`/api/extract/list?${params.toString()}`)).json();
+  const keepVisible=queryKey===FEED_QUERY_KEY ? VISIBLE_COUNT : 0;
+  FEED_QUERY_KEY=queryKey;
+  FEED_CACHE={};
+  FEED_ITEMS=d.items||[];
+  FEED_ITEMS.forEach(it=>{FEED_CACHE[it.id]=it;});
+  VISIBLE_COUNT=Math.min(FEED_ITEMS.length,Math.max(FEED_BATCH,keepVisible||0));
+  updateCategoryOptions(FEED_ITEMS);
+  const total=FEED_ITEMS.length;
+  const done=FEED_ITEMS.filter(x=>x.status==="完成").length;
+  const lapian=FEED_ITEMS.filter(x=>x.content_type==="拉片").length;
+  document.getElementById("totalNum").textContent=total;
+  document.getElementById("doneNum").textContent=done;
+  document.getElementById("lapianNum").textContent=lapian;
+  document.getElementById("feedCnt").textContent=`已载入 ${d.total||total} 条`;
+  renderDiscovery(FEED_ITEMS);
+  renderFeedList();
+}
+
+function updateCategoryOptions(items){
+  const sel=document.getElementById("filterCategory");
+  if(!sel)return;
+  const old=sel.value;
+  const cats=[...new Set(items.map(x=>x.category).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">全部AI分类</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  sel.value=cats.includes(old)?old:"";
+}
+function debouncedLoadFeed(){
+  clearTimeout(feedFilterTimer);
+  feedFilterTimer=setTimeout(loadFeed,260);
+}
+function resetFilters(){
+  ["filterQ","filterPlatform","filterType","filterCategory"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  loadFeed();
+}
+
+function startAsyncPoll(){
+  if(asyncPollTimer)clearInterval(asyncPollTimer);
+  let ticks=0;
+  const pending=new Set(FEED_ITEMS.filter(item=>item.status==="处理中").map(item=>item.id));
+  asyncPollTimer=setInterval(async()=>{
+    ticks++;
+    try{
+      const d=await (await fetch("/api/extract/list")).json();
+      const hasWorking=(d.items||[]).some(x=>x.status==="处理中");
+      const justCompleted=(d.items||[]).some(item=>pending.has(item.id)&&item.status==="完成");
+      (d.items||[]).forEach(item=>{if(item.status==="处理中")pending.add(item.id);else pending.delete(item.id);});
+      await loadFeed();
+      if((!hasWorking && ticks>4) || ticks>180){
+        clearInterval(asyncPollTimer);
+        asyncPollTimer=null;
+      }
+      if(justCompleted){
+        document.getElementById("status").textContent="素材处理已完成，可在下方查看报告。";
+      }
+    }catch(e){}
+  },5000);
+}
+
+async function deleteRecord(id,btn){
+  const it=FEED_CACHE[id];
+  if(!confirm(`确定删除「${it?.title||"这条记录"}」？此操作不可恢复。`))return;
+  btn.disabled=true;
+  try{
+    const d=await (await fetch("/api/extract/delete",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id})
+    })).json();
+    if(d.ok){toast("已删除");await loadFeed();}
+    else{toast(d.error||"删除失败");btn.disabled=false;}
+  }catch(e){
+    toast("请求失败");
+    btn.disabled=false;
+  }
+}
+function submitAgain(){toast("任务还在后台处理，稍后会自动刷新");}
+
+async function retryRecord(id,btn){
+  const it=FEED_CACHE[id];
+  if(!it?.source_url)return toast("这条记录没有可重试的原链接");
+  const mode=it.content_type==="提示词反推"?"reverse_prompt":(it.content_type==="拉片"?"lapian":"parse");
+  btn.disabled=true;
+  btn.textContent="重新提交中…";
+  try{
+    const resp=await fetch("/api/extract",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({url:it.source_url,mode})
+    });
+    const data=await resp.json();
+    if(!data.ok)throw new Error(data.error||"提交失败");
+    toast("已重新提交解析");
+    startAsyncPoll();
+    await loadFeed();
+  }catch(e){
+    toast("重新解析失败："+e.message);
+    btn.disabled=false;
+    btn.textContent="重新解析";
+  }
+}
+
+document.getElementById("urlInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    submitAction("parse");
+  }
+});
+loadFeed().then(startAsyncPoll);
+</script>
+{% endblock %}
